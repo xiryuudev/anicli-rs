@@ -4,6 +4,15 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.1.2] - 2026-11-15
+
+### Diperbaiki
+
+- **Windows (lanjutan):** `write_atomic` gagal `Access is denied` karena handle file
+  `.tmp` masih terbuka saat `rename`. Handle kini ditutup lebih dulu, lalu file tujuan
+  (jika ada) dihapus sebelum rename. Ini memperbaiki simpan config/bookmark/riwayat
+  di Windows; CI Windows kini hijau.
+
 ## [0.1.1] - 2026-11-15
 
 ### Diperbaiki

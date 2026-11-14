@@ -784,8 +784,11 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), ConfigErro
         }
         let file = std::fs::File::open(&tmp)?;
         file.sync_all()?;
-        // Windows: `rename` tidak mengganti file tujuan yang sudah ada (berbeda
-        // dengan POSIX). Hapus tujuan dulu supaya simpan ulang tetap berhasil.
+        // Tutup handle SEBELUM rename: Windows menolak memindahkan file yang masih
+        // dibuka tanpa FILE_SHARE_DELETE (Access is denied).
+        drop(file);
+        // Windows: `rename` juga tidak mengganti file tujuan yang sudah ada
+        // (berbeda dengan POSIX). Hapus tujuan dulu supaya simpan ulang berhasil.
         #[cfg(windows)]
         {
             if path.exists() {
