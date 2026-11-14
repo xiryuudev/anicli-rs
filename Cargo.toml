@@ -1,0 +1,123 @@
+[package]
+name = "anicli-rs"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+# Resolver 3 = MSRV-aware: Cargo memilih versi dependency yang kompatibel dengan
+# rust-version di atas, jadi klaim MSRV 1.88 tidak diam-diam dilanggar dependency.
+resolver = "3"
+license = "MIT"
+authors = ["Farrel Zacky Rahmanda <xiryuudev@users.noreply.github.com>"]
+description = "TUI streaming anime subtitle Indonesia: source scraper modular, fallback antar source, pemutar mpv/vlc"
+repository = "https://github.com/xiryuudev/anicli-rs"
+homepage = "https://github.com/xiryuudev/anicli-rs"
+readme = "README.md"
+keywords = ["anime", "tui", "streaming", "scraper", "cli"]
+categories = ["command-line-utilities", "multimedia::video"]
+default-run = "anicli"
+
+[lib]
+name = "anicli_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "anicli"
+path = "src/main.rs"
+
+[[bin]]
+name = "sourcecheck"
+path = "src/bin/sourcecheck.rs"
+
+[features]
+default = []
+# Preview poster di terminal (Kitty/iTerm2/Sixel). Nonaktif secara default supaya
+# binary normal tidak menarik dependency `image` + protokol grafis terminal.
+image-preview = ["dep:ratatui-image", "dep:image"]
+
+[dependencies]
+# --- TUI ---
+ratatui = "0.30"
+# crossterm hanya ditambahkan langsung untuk fitur `event-stream` (EventStream async);
+# tipe & backend tetap diimpor lewat re-export `ratatui::crossterm` (DESIGN D16).
+crossterm = { version = "0.29", features = ["event-stream"] }
+
+# --- Async runtime ---
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "macros",
+    "sync",
+    "time",
+    "process",
+    "signal",
+    "fs",
+    "io-util",
+    "net",
+] }
+
+# --- HTTP ---
+# reqwest 0.13: fitur TLS bernama `rustls` + `webpki-roots` (bukan `rustls-tls`).
+# Tanpa OpenSSL => cross-compile Windows bersih (DESIGN D11).
+reqwest = { version = "0.13", default-features = false, features = [
+    "rustls",
+    "webpki-roots",
+    "charset",
+    "http2",
+    "json",
+    "gzip",
+    "brotli",
+    "cookies",
+    "form",
+] }
+scraper = "0.29"
+
+# --- Serialization / config ---
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+directories = "6"
+
+# --- Logging ---
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "chrono"] }
+tracing-appender = "0.2"
+
+# --- CLI / util ---
+clap = { version = "4", features = ["derive", "env", "wrap_help"] }
+async-trait = "0.1"
+anyhow = "1"
+thiserror = "2"
+url = { version = "2", features = ["serde"] }
+base64 = "0.22"
+html-escape = "0.3"
+futures = "0.3"
+unicode-width = "0.2"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+
+# --- Opsional: preview poster (cargo build --features image-preview) ---
+ratatui-image = { version = "11", optional = true, default-features = false, features = [
+    "crossterm",
+] }
+# Decoder gambar dibatasi ke format yang benar-benar dipakai poster; jangan pakai
+# `image-defaults` (menarik avif/ravif/tiff dsb. dan membuat build jauh lebih lama).
+image = { version = "0.25", optional = true, default-features = false, features = [
+    "png",
+    "jpeg",
+    "webp",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+# Build debug tetap nyaman dipakai TUI: dependensi di-optimasi, crate sendiri cepat di-compile.
+[profile.dev]
+opt-level = 1
+debug = 1
+
+[profile.dev.package."*"]
+opt-level = 2

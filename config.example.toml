@@ -1,0 +1,230 @@
+# =============================================================================
+# anicli-rs — contoh konfigurasi
+# =============================================================================
+# Salin file ini ke lokasi config yang sesuai OS, atau jalankan:
+#
+#   anicli config init
+#
+# Lokasi default:
+#   Linux   : $XDG_CONFIG_HOME/anicli-rs/config.toml  (~/.config/anicli-rs/config.toml)
+#   Windows : %APPDATA%\anicli-rs\config.toml
+#   macOS   : ~/Library/Application Support/anicli-rs/config.toml
+#
+# Semua nilai di bawah adalah default yang aman. Perubahan berlaku saat aplikasi
+# dijalankan ulang (atau lewat layar Settings di TUI).
+#
+# Proyek ini untuk penggunaan pribadi/edukasi. Konten milik masing-masing penyedia;
+# hormati ToS dan robots.txt tiap situs. Lihat README untuk batasan hukum.
+# =============================================================================
+
+# Jangan diubah manual kecuali kamu tahu apa yang dilakukan. Dipakai untuk migrasi
+# config saat format berubah di versi berikutnya.
+config_version = 1
+
+
+# -----------------------------------------------------------------------------
+# [general]
+# -----------------------------------------------------------------------------
+[general]
+# Source yang aktif saat aplikasi dibuka. Harus salah satu nama di [sources.*]
+# yang `enabled = true`.
+default_source = "samehadaku"
+
+# Urutan fallback saat source utama gagal (error jaringan, diblokir, parser rusak,
+# stream kosong). Source pertama dicoba, lalu berikutnya. Nama yang tidak dikenal
+# akan diabaikan dengan peringatan di log.
+fallback_order = ["samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kusonime"]
+
+# Bahasa antarmuka. Saat ini hanya "id".
+language = "id"
+
+
+# -----------------------------------------------------------------------------
+# [playback] — pemutar video eksternal
+# -----------------------------------------------------------------------------
+[playback]
+# "mpv" (disarankan) atau "vlc".
+player = "mpv"
+
+# Kosongkan untuk mencari otomatis di PATH (mpv/mpv.exe). Isi path absolut hanya
+# kalau binary tidak ada di PATH, mis. "C:\\Program Files\\mpv\\mpv.exe".
+mpv_path = ""
+vlc_path = ""
+
+# Resolusi yang dipilih otomatis saat memutar. Nilai yang dikenali: "240p", "360p",
+# "480p", "720p", "1080p". Kalau tidak tersedia, dipilih resolusi terdekat.
+default_resolution = "720p"
+
+# Cara memilih saat resolusi default tidak ada:
+#   "nearest_higher" — cari yang lebih tinggi terdekat dulu, lalu lebih rendah
+#   "nearest_lower"  — sebaliknya
+#   "exact_only"     — jangan putar kalau resolusi tidak persis tersedia
+resolution_policy = "nearest_higher"
+
+# Kalau true, container MKV dipilih saat ada beberapa link di resolusi yang sama.
+prefer_mkv = false
+
+# Simpan episode terakhir per anime dan tawarkan "lanjutkan" saat membuka detail.
+resume_last_episode = true
+
+# Menangani link yang berupa halaman embed (bukan file langsung):
+#   "ytdl"    — kalau `yt-dlp` terpasang, serahkan ke mpv --ytdl (paling fleksibel)
+#   "browser" — buka di browser, karena mpv tidak bisa memutar halaman HTML
+#   "skip"    — jangan tawarkan link embed sama sekali
+# Host yang sudah punya resolver internal (icefile, desustream, blogspot) tetap
+# diputar langsung oleh mpv tanpa opsi ini.
+embed_strategy = "ytdl"
+
+# true  = mpv memakai terminal ini; TUI di-suspend selama pemutaran (kontrol keyboard mpv aktif)
+# false = mpv dijalankan detached (--no-terminal); TUI tetap hidup
+foreground = false
+
+# Argumen tambahan yang ditempel ke perintah player. Contoh:
+# extra_args = ["--cache=yes", "--hwdec=auto-safe"]
+extra_args = []
+
+
+# -----------------------------------------------------------------------------
+# [http] — sopan santun ke sumber (rate limit, timeout, UA)
+# -----------------------------------------------------------------------------
+[http]
+# Jeda minimum antar request ke host yang sama (ms). Jangan diturunkan ke 0.
+request_delay_ms = 500
+
+# Jitter tambahan 0..N ms supaya pola request tidak menyerupai bot.
+jitter_ms = 300
+
+# Batas request paralel total lintas source. Per host selalu diserialisasi.
+max_concurrent = 6
+
+connect_timeout_secs = 8
+timeout_secs = 20
+
+# Percobaan ulang untuk error jaringan/5xx/429 (GET idempoten). 0 = tanpa retry.
+retries = 2
+
+# User agent browser yang wajar. Beberapa source (Samehadaku) memblokir UA kosong
+# atau UA generik seperti "curl/..." dengan 403, jadi jangan diganti sembarangan.
+user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
+# Berapa lama hasil probe domain/mirror di-cache (detik).
+mirror_cache_ttl_secs = 3600
+
+# Opsional (tidak disarankan): kirim cookie manual dari browser untuk situs yang
+# memaksa sesi. Kosongkan. Jangan pernah commit nilai cookie ke repo.
+# cookie_header = ""
+
+
+# -----------------------------------------------------------------------------
+# [storage] — riwayat, bookmark, cache
+# -----------------------------------------------------------------------------
+[storage]
+history_enabled = true
+
+# Jumlah maksimum entri riwayat (yang tertua dibuang).
+max_history = 500
+
+# Jumlah maksimum bookmark.
+max_bookmarks = 200
+
+# Override direktori data. Kosongkan untuk default OS:
+#   Linux   : $XDG_DATA_HOME/anicli-rs (~/.local/share/anicli-rs)
+#   Windows : %LOCALAPPDATA%\anicli-rs
+data_dir = ""
+
+
+# -----------------------------------------------------------------------------
+# [ui] — tampilan terminal
+# -----------------------------------------------------------------------------
+[ui]
+# "default" (mengikuti warna terminal) atau "dark".
+theme = "default"
+
+# Aktifkan dukungan mouse (klik & scroll). Beberapa terminal menangkap mouse
+# sehingga menyalin teks jadi sulit; default false.
+mouse = false
+
+# Gabungkan hasil browse ongoing/completed lintas source menjadi satu daftar
+# (didedupe berdasarkan judul+tahun). false = tampilkan per source.
+merge_browse = false
+
+# Hanya berefek kalau binary dibuild dengan `--features image-preview`.
+image_preview = false
+
+
+# -----------------------------------------------------------------------------
+# [logging]
+# -----------------------------------------------------------------------------
+[logging]
+# trace | debug | info | warn | error
+level = "info"
+
+# Hapus file log lebih tua dari N hari di direktori log.
+max_days = 7
+
+# true = tulis log juga ke stderr (hanya berguna dengan --no-tui).
+to_stderr = false
+
+
+# =============================================================================
+# [sources.*] — satu blok per penyedia
+# =============================================================================
+# enabled  : ikut dipakai (search/browse/fallback) atau tidak.
+# base_url : domain utama. Domain situs anime sering berpindah; kalau berubah,
+#            cukup ubah di sini tanpa perlu rebuild.
+# mirrors  : kandidat domain lain. Aplikasi akan probe berurutan dan memvalidasi
+#            isi halaman (bukan hanya status 200), lalu memakai yang sehat.
+#
+# Source yang belum diimplementasikan tidak akan dikenali (diabaikan + warning log).
+# =============================================================================
+
+[sources.samehadaku]
+enabled = true
+# Hanya v2 yang menyajikan konten anime. samehadaku.care adalah portal JS yang
+# baru redirect setelah 10 detik, jadi jangan dipakai sebagai mirror.
+base_url = "https://v2.samehadaku.how"
+mirrors = []
+
+[sources.otakudesu]
+enabled = true
+# Situs asli mendeklarasikan domainnya sendiri di halaman home (div.infoupdate).
+# Domain "otakudesu.*" lain sering clone/domain parkir.
+base_url = "https://otakudesu.blog"
+mirrors = []
+
+[sources.oploverz]
+enabled = true
+# SvelteKit + API JSON (backapi.oploverz.ac); stream via upbolt/filedon/blogger.
+base_url = "https://oploverz.diy"
+mirrors = ["https://oploverz.site"]
+
+[sources.animeindo]
+enabled = true
+# Hanya anime-indo.lol yang asli; domain animeindo.* lain adalah clone/parked.
+base_url = "https://anime-indo.lol"
+mirrors = []
+
+[sources.anoboy]
+enabled = true
+base_url = "https://anoboy.id"
+mirrors = ["https://anoboy.nl"]
+
+[sources.kusonime]
+enabled = true
+base_url = "https://kusonime.com"
+# Kusonime bersifat batch/download: berguna untuk pencarian + metadata + katalog
+# unduhan, tetapi TIDAK menyediakan streaming per episode.
+mirrors = []
+
+# -----------------------------------------------------------------------------
+# Contoh menambah source lain (belum diimplementasikan di v1):
+# -----------------------------------------------------------------------------
+# [sources.oploverz]
+# enabled  = false
+# base_url = "https://oploverz.now"
+# mirrors  = []
+#
+# [sources.anoboy]
+# enabled  = false
+# base_url = "https://anoboy.li"
+# mirrors  = []

@@ -1,0 +1,6 @@
+# Toolchain yang dipakai CI (dan rustup lokal bila terpasang).
+# MSRV proyek = 1.88 karena `ratatui 0.30` mensyaratkan Rust 1.88.
+# Tanpa rustup, file ini diabaikan dan cargo sistem yang dipakai.
+[toolchain]
+channel = "1.88"
+components = ["rustfmt", "clippy"]

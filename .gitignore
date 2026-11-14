@@ -1,0 +1,9 @@
+# build
+/target
+/.cargo-home
+/.scratch
+# recon mentah (HTML pihak ketiga, besar) — fixture untuk test disalin ke tests/fixtures
+/research/raw/
+# OS / editor
+.DS_Store
+*.swp
