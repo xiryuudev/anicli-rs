@@ -246,13 +246,14 @@ pub async fn spawn_player(command: &PlayerCommand, foreground: bool) -> SourceRe
     process.args(&command.args);
     process.stdin(std::process::Stdio::null());
     if foreground {
-        process
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit());
+        process.stdout(std::process::Stdio::inherit());
+        // stderr tetap ditangkap: mpv menulis error ke sini walau TUI aktif.
+        process.stderr(std::process::Stdio::piped());
     } else {
-        process
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
+        process.stdout(std::process::Stdio::null());
+        // Tangkap stderr supaya kegagalan mpv (mis. yt-dlp error) bisa ditampilkan,
+        // bukan sekadar "selesai diputar".
+        process.stderr(std::process::Stdio::piped());
     }
     process.spawn().map_err(|err| {
         SourceError::app(format!(
@@ -260,6 +261,42 @@ pub async fn spawn_player(command: &PlayerCommand, foreground: bool) -> SourceRe
             command.program.display()
         ))
     })
+}
+
+/// Tunggu player selesai sambil membaca stderr (untuk pesan error yang berguna).
+pub async fn wait_with_stderr(mut child: Child) -> (Option<i32>, String) {
+    use tokio::io::AsyncReadExt as _;
+
+    let stderr = child.stderr.take();
+    let reader = tokio::spawn(async move {
+        let mut buffer = String::new();
+        if let Some(mut stderr) = stderr {
+            let _ = stderr.read_to_string(&mut buffer).await;
+        }
+        buffer
+    });
+
+    let code = child.wait().await.ok().and_then(|status| status.code());
+    let stderr = reader.await.unwrap_or_default();
+    (code, stderr)
+}
+
+/// Ringkas stderr menjadi satu baris pendek untuk status/error TUI.
+pub fn summarize_stderr(stderr: &str, max_chars: usize) -> String {
+    let noisy = ["[ffmpeg]", "[ytdl_hook]", "[ytdl]", "[file]"];
+    let line = stderr
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .rev()
+        .find(|line| !noisy.iter().any(|prefix| line.starts_with(prefix)))
+        .or_else(|| stderr.lines().map(str::trim).find(|line| !line.is_empty()))
+        .unwrap_or("tanpa detail");
+    let mut text = line.to_string();
+    if text.chars().count() > max_chars {
+        text = text.chars().take(max_chars).collect::<String>() + "…";
+    }
+    text
 }
 
 /// Buka URL di browser default (untuk link embed yang tidak bisa diputar langsung).

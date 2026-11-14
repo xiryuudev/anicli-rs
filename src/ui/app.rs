@@ -94,6 +94,8 @@ pub enum AppEvent {
     },
     PlayerExited {
         program: String,
+        code: Option<i32>,
+        stderr: String,
     },
     Failed {
         job: u64,
@@ -125,6 +127,7 @@ pub struct App {
     pub resolution_override: Option<Resolution>,
     pub attempts: String,
     pub player_status: String,
+    pub player_running: bool,
     pub history: History,
     pub bookmarks: Bookmarks,
     pub log_buffer: Option<LogBuffer>,
@@ -183,6 +186,7 @@ impl App {
             resolution_override: None,
             attempts: String::new(),
             player_status: String::new(),
+            player_running: false,
             history,
             bookmarks,
             log_buffer,
@@ -261,6 +265,7 @@ impl App {
             .map(|index| (index + 1) % available.len())
             .unwrap_or(0);
         self.resolution_override = Some(available[position]);
+        self.highlight_best_stream();
         self.status = format!("resolusi: {}", available[position]);
     }
 
@@ -936,21 +941,51 @@ impl App {
         });
     }
 
-    /// Pilih link terbaik lalu putar (mpv/vlc) atau buka browser untuk embed.
-    fn play_selected(&mut self, tx: &UnboundedSender<AppEvent>) {
-        let Some(link) = resolve::select_stream(
+    /// Link yang sedang di-highlight di layar Stream.
+    pub fn selected_stream(&self) -> Option<&StreamLink> {
+        self.streams.get(self.stream_index)
+    }
+
+    /// Indeks link terbaik sesuai preferensi resolusi (default highlight).
+    fn best_stream_index(&self) -> Option<usize> {
+        let best = resolve::select_stream(
             &self.streams,
             self.preferred_resolution(),
             self.config.playback.resolution_policy,
             self.config.playback.prefer_mkv,
-        ) else {
+        )?;
+        self.streams
+            .iter()
+            .position(|link| std::ptr::eq(link, best))
+    }
+
+    /// Pindahkan highlight ke link terbaik pada resolusi aktif (dipakai `r` dan saat
+    /// stream selesai dimuat).
+    fn highlight_best_stream(&mut self) {
+        if let Some(index) = self.best_stream_index() {
+            self.stream_index = index;
+        }
+    }
+
+    /// Pilih link terbaik lalu putar (mpv/vlc) atau buka browser untuk embed.
+    fn play_selected(&mut self, tx: &UnboundedSender<AppEvent>) {
+        if self.player_running {
+            self.status = "player masih berjalan — tutup jendela mpv dulu".to_string();
+            return;
+        }
+        // Pakai BARIS yang di-highlight. Sebelumnya selalu memilih link "terbaik",
+        // sehingga memilih baris download tetap memutar link Direct lain.
+        let Some(link) = self.streams.get(self.stream_index).cloned() else {
+            self.error = Some("Belum ada link. Ambil stream dulu.".to_string());
+            return;
+        };
+        if link.stream_kind == StreamKind::DownloadOnly {
             self.error = Some(
-                "Tidak ada link yang bisa diputar (mungkin hanya unduhan). Coba source lain (s)."
+                "Baris ini hanya unduhan (bukan streaming). Pilih baris direct/embed, atau tekan r."
                     .to_string(),
             );
             return;
-        };
-        let link = link.clone();
+        }
         let title = self
             .detail
             .as_ref()
@@ -998,14 +1033,16 @@ impl App {
                 let foreground = self.config.playback.foreground;
                 tokio::spawn(async move {
                     match player::spawn_player(&command_for_log, foreground).await {
-                        Ok(mut child) => {
+                        Ok(child) => {
                             let _ = tx.send(AppEvent::PlayerStarted {
                                 job,
                                 program: command_for_log.program.display().to_string(),
                             });
-                            let _ = child.wait().await;
+                            let (code, stderr) = player::wait_with_stderr(child).await;
                             let _ = tx.send(AppEvent::PlayerExited {
                                 program: command_for_log.program.display().to_string(),
+                                code,
+                                stderr,
                             });
                         }
                         Err(error) => {
@@ -1110,6 +1147,7 @@ impl App {
                 self.streams = links;
                 self.stream_index = 0;
                 self.resolution_override = None;
+                self.highlight_best_stream();
                 self.screen = Screen::Streams;
             }
             AppEvent::BrowseOk { job, tab, items } => {
@@ -1135,12 +1173,33 @@ impl App {
                 if job != self.job {
                     return;
                 }
+                self.player_running = true;
                 self.player_status = format!("diputar oleh {program}");
-                self.status = format!("▶ {program} berjalan (p untuk putar ulang)");
+                self.status = format!("▶ {program} berjalan — tutup jendelanya untuk memutar lagi");
             }
-            AppEvent::PlayerExited { program } => {
-                self.player_status = format!("{program} selesai");
-                self.status = format!("{program} selesai diputar");
+            AppEvent::PlayerExited {
+                program,
+                code,
+                stderr,
+            } => {
+                self.player_running = false;
+                if code == Some(0) {
+                    self.player_status = format!("{program} selesai");
+                    self.status = format!("{program} selesai diputar");
+                    self.error = None;
+                } else {
+                    let detail = player::summarize_stderr(&stderr, 260);
+                    let exit = code
+                        .map(|code| format!("exit {code}"))
+                        .unwrap_or_else(|| "dihentikan".to_string());
+                    self.player_status = format!("{program} gagal ({exit})");
+                    self.status = format!("{program} gagal diputar ({exit})");
+                    self.error = Some(format!(
+                        "{program} gagal diputar ({exit}): {detail}. \
+                         Jika ini link embed, coba `playback.embed_strategy = \"browser\"` \
+                         atau pilih link direct."
+                    ));
+                }
             }
             AppEvent::Failed { job, error } => {
                 if job != self.job {

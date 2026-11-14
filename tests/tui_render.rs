@@ -1,6 +1,7 @@
 //! Test render TUI dengan `TestBackend` (tanpa terminal nyata) + logika navigasi.
 
 use std::sync::Arc;
+#[cfg(unix)]
 use std::time::Duration;
 
 use anicli_rs::bookmarks::BookmarkEntry;
@@ -545,5 +546,64 @@ async fn download_only_link_is_refused_without_spawning() {
 
     app.handle_input(key(KeyCode::Char('p')), &tx);
     assert!(app.error.as_deref().unwrap_or_default().contains("unduhan"));
+    assert!(app.history.is_empty());
+}
+
+#[tokio::test]
+async fn download_only_row_is_refused_even_if_direct_links_exist() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = app();
+    app.detail = Some(sample_detail());
+    app.episodes = sample_episodes();
+    app.episode_index = 0;
+    app.streams = sample_streams(); // [direct 720, embed 480, download 1080]
+    app.stream_index = 2; // baris download di-highlight
+    app.screen = ui::Screen::Streams;
+
+    app.handle_input(key(KeyCode::Char('p')), &tx);
+    assert!(
+        app.error.as_deref().unwrap_or_default().contains("unduhan"),
+        "error: {:?}",
+        app.error
+    );
+    assert!(app.history.is_empty(), "tidak boleh mencatat riwayat");
+}
+
+#[tokio::test]
+async fn streams_ok_highlights_best_link() {
+    let mut app = app();
+    app.job = 5;
+    let mut links = sample_streams();
+    links.reverse(); // [download 1080, embed 480, direct 720]
+    app.handle_event(ui::AppEvent::StreamsOk {
+        job: 5,
+        links,
+        source: "samehadaku".into(),
+        attempts: String::new(),
+    });
+    assert_eq!(app.screen, ui::Screen::Streams);
+    let selected = app.selected_stream().expect("ada link");
+    assert_eq!(selected.stream_kind, StreamKind::Direct);
+    assert_eq!(selected.resolution, Some(Resolution::P720));
+}
+
+#[tokio::test]
+async fn player_running_guard_prevents_double_spawn() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = app();
+    app.detail = Some(sample_detail());
+    app.episodes = sample_episodes();
+    app.episode_index = 0;
+    app.streams = sample_streams();
+    app.stream_index = 0;
+    app.screen = ui::Screen::Streams;
+    app.player_running = true;
+
+    app.handle_input(key(KeyCode::Char('p')), &tx);
+    assert!(
+        app.status.contains("masih berjalan"),
+        "status: {}",
+        app.status
+    );
     assert!(app.history.is_empty());
 }

@@ -4,6 +4,25 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.1.1] - 2026-11-15
+
+### Diperbaiki
+
+- **Windows:** `write_atomic` kini menghapus file tujuan sebelum `rename`
+  (`fs::rename` Windows tidak bisa menimpa file yang ada). Sebelumnya simpan config/
+  bookmark/riwayat kedua kali gagal — ditemukan oleh CI Windows.
+- **Player:** stderr mpv/vlc sekarang ditangkap dan **exit code non-zero dilaporkan
+  sebagai error** ("mpv gagal diputar (exit 2): …"), bukan lagi "selesai diputar".
+  Ringkasan stderr ditampilkan di banner error TUI.
+- **Pemilihan stream:** tombol `p`/`Enter` memutar **baris yang di-highlight**, bukan
+  selalu link "terbaik". Baris download-only ditolak dengan pesan jelas (sebelumnya
+  memilih baris download tetap memutar link Direct lain — membingungkan).
+- Daftar stream otomatis mem-highlight link terbaik; `r` memindahkan highlight ke
+  resolusi pilihan.
+- Guard agar `p` tidak men-spawn pemutar ganda saat mpv masih berjalan.
+- CI: tambah workflow GitHub Actions (fmt/clippy/test/release + MSRV 1.88), gate test
+  player khusus Unix, dan perbaikan unused import di Windows.
+
 ## [0.1.0] - 2026-11-15
 
 Rilis publik pertama. Aplikasi TUI Rust untuk mencari, memilih episode/resolusi, lalu
