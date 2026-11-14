@@ -787,14 +787,34 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), ConfigErro
         // Tutup handle SEBELUM rename: Windows menolak memindahkan file yang masih
         // dibuka tanpa FILE_SHARE_DELETE (Access is denied).
         drop(file);
-        // Windows: `rename` juga tidak mengganti file tujuan yang sudah ada
-        // (berbeda dengan POSIX). Hapus tujuan dulu supaya simpan ulang berhasil.
+        // Windows: rename bisa gagal sementara (Access denied) karena file baru
+        // masih dipindai antivirus/Defender, dan rename juga tidak mengganti file
+        // tujuan yang ada. Strategi: hapus tujuan, retry rename beberapa kali,
+        // lalu fallback salin isi (lebih penting simpan berhasil daripada atomik).
         #[cfg(windows)]
         {
             if path.exists() {
-                std::fs::remove_file(path)?;
+                let _ = std::fs::remove_file(path);
             }
+            let mut last_error = None;
+            for attempt in 0..8 {
+                match std::fs::rename(&tmp, path) {
+                    Ok(()) => return Ok(()),
+                    Err(err) => {
+                        last_error = Some(err);
+                        if path.exists() {
+                            let _ = std::fs::remove_file(path);
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(40 * (attempt + 1)));
+                    }
+                }
+            }
+            // Fallback terakhir: salin isi lalu hapus tmp.
+            std::fs::copy(&tmp, path).map_err(|err| last_error.unwrap_or(err))?;
+            let _ = std::fs::remove_file(&tmp);
+            return Ok(());
         }
+        #[cfg(not(windows))]
         std::fs::rename(&tmp, path)
     };
 

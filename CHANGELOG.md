@@ -4,6 +4,15 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.1.3] - 2026-11-15
+
+### Diperbaiki
+
+- **Windows (final):** `write_atomic` kini memakai retry dengan backoff + fallback
+  salin isi, karena `rename` bisa gagal sementara (`Access is denied`) akibat file
+  baru masih dipindai antivirus/Defender. Simpan config/bookmark/riwayat di Windows
+  berhasil; CI Windows hijau.
+
 ## [0.1.2] - 2026-11-15
 
 ### Diperbaiki
