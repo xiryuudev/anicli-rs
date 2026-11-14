@@ -493,6 +493,10 @@ fn settings_screen_shows_effective_config() {
     assert!(text.contains("fallback"), "{text}");
 }
 
+// Fake player memakai `/bin/true` (Unix). Di Windows tidak ada padanan yang aman
+// untuk di-spawn dengan argumen mpv, jadi test ini hanya dijalankan di Unix;
+// pencatatan riwayat sendiri diuji lintas platform di `src/history.rs`.
+#[cfg(unix)]
 #[tokio::test]
 async fn playing_records_history_with_a_fake_player() {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();

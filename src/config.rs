@@ -784,6 +784,14 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), ConfigErro
         }
         let file = std::fs::File::open(&tmp)?;
         file.sync_all()?;
+        // Windows: `rename` tidak mengganti file tujuan yang sudah ada (berbeda
+        // dengan POSIX). Hapus tujuan dulu supaya simpan ulang tetap berhasil.
+        #[cfg(windows)]
+        {
+            if path.exists() {
+                std::fs::remove_file(path)?;
+            }
+        }
         std::fs::rename(&tmp, path)
     };
 
