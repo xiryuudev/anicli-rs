@@ -71,15 +71,28 @@ Windows (MSVC) notes:
   on `PATH` (`choco install cmake nasm -y` works on CI runners).
 - Release artifacts are built by CI for `x86_64-pc-windows-msvc`.
 
-## Install a release build
+## Install a prebuilt binary (built by CI)
+
+Every release is built and packaged by GitHub Actions on **Ubuntu** and **Windows
+(MSVC)** — no locally-built binaries are published.
 
 ```bash
 # Linux x86_64
 curl -L -o anicli.tar.gz \
-  https://github.com/xiryuudev/anicli-rs/releases/latest/download/anicli-rs-v0.2.0-x86_64-linux.tar.gz
+  https://github.com/xiryuudev/anicli-rs/releases/latest/download/anicli-rs-v0.3.0-x86_64-linux.tar.gz
 tar -xzf anicli.tar.gz
 ./anicli
+
+# Windows x86_64 (PowerShell): download the .zip from the same release page
+# https://github.com/xiryuudev/anicli-rs/releases/latest
 ```
+
+Per-file binaries (`anicli-x86_64-linux`, `anicli-x86_64-windows.exe`, plus
+`sourcecheck`) and `SHA256SUMS-*.txt` are attached to each release as well.
+
+**Bleeding edge (not yet tagged):** open the latest green
+[CI run](https://github.com/xiryuudev/anicli-rs/actions/workflows/ci.yml), scroll to
+**Artifacts**, and download `anicli-rs-x86_64-linux` / `anicli-rs-x86_64-windows`.
 
 ## Usage
 
@@ -183,7 +196,9 @@ cargo test                    # 200+ tests, offline fixtures, TUI TestBackend
 cargo run --bin sourcecheck -- --source animeindo --query "black clover"
 ```
 
-CI runs these on Ubuntu and Windows, plus a MSRV 1.88 job.
+CI runs these on Ubuntu and Windows, plus a MSRV 1.88 job. Two extra CI jobs build the
+release binaries (Linux `tar.gz`, Windows `zip`) and, for `v*` tags, attach them to the
+GitHub release automatically.
 
 ## Project layout
 
