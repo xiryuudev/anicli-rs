@@ -124,6 +124,7 @@ async fn download(
     // rustls-no-provider di reqwest).
     crate::http::ensure_tls_provider();
     let client = reqwest::Client::builder()
+        .use_preconfigured_tls(crate::http::tls_config())
         .build()
         .map_err(|err| format!("gagal membuat client: {err}"))?;
     let mut request = client.get(spec.url.clone());

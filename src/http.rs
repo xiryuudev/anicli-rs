@@ -326,6 +326,24 @@ impl HttpClient {
     }
 }
 
+/// Konfigurasi TLS rustls dengan root CA statis (`webpki-roots`).
+///
+/// Sengaja tidak memakai verifier bawaan reqwest: di Android verifier itu
+/// (`rustls-platform-verifier`) butuh JNI/`Context` dan akan panic pada binary
+/// Termux yang bukan aplikasi JNI. Root statis bekerja sama baik di desktop
+/// maupun Android.
+pub fn tls_config() -> rustls::ClientConfig {
+    ensure_tls_provider();
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let mut config = rustls::ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    // ALPN untuk HTTP/2 (reqwest mengaktifkan http2).
+    config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+    config
+}
+
 fn build_client(config: &HttpConfig, follow_redirects: bool) -> SourceResult<Client> {
     let mut builder = Client::builder()
         .user_agent(config.user_agent.clone())
@@ -333,7 +351,8 @@ fn build_client(config: &HttpConfig, follow_redirects: bool) -> SourceResult<Cli
         .connect_timeout(Duration::from_secs(config.connect_timeout_secs.max(1)))
         .gzip(true)
         .brotli(true)
-        .cookie_store(true);
+        .cookie_store(true)
+        .use_preconfigured_tls(tls_config());
 
     if !follow_redirects {
         builder = builder.redirect(reqwest::redirect::Policy::none());
@@ -523,6 +542,13 @@ pub fn referer_header(url: &Url) -> Option<HeaderValue> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn tls_config_sets_alpn_and_static_roots() {
+        let config = super::tls_config();
+        assert!(config.alpn_protocols.contains(&b"h2".to_vec()));
+        assert!(config.alpn_protocols.contains(&b"http/1.1".to_vec()));
+    }
     use super::*;
 
     #[test]

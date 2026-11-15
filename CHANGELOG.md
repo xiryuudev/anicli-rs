@@ -4,6 +4,18 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.4.3] - 2026-11-15
+
+### Diperbaiki
+
+- **Android/Termux panic saat mencari**: binary Termux crash di
+  `rustls-platform-verifier-0.6.2/src/android.rs:94` karena verifier Android butuh
+  JNI/`Context`, yang tidak ada pada binary non-JNI. Sebagai gantinya, TLS kini
+  memakai `rustls` + **root CA statis `webpki-roots`** melalui
+  `http::tls_config()` dan `use_preconfigured_tls` (ALPN h2/http1.1), sehingga
+  verifikasi sertifikat tidak menyentuh API Android. Terverifikasi live di desktop;
+  binary Android dibangun ulang oleh CI.
+
 ## [0.4.2] - 2026-11-15
 
 ### Ditambahkan
