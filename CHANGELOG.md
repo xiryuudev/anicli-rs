@@ -4,6 +4,21 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.4.1] - 2026-11-15
+
+### Diperbaiki
+
+- Android: setelah intent berhasil, TUI tidak lagi menulis "selesai diputar"
+  (padahal video baru dibuka di aplikasi lain). Ada event `PlayerLaunched` dengan
+  status "dibuka di <program> — putar di aplikasi Android".
+
+### Ditambahkan
+
+- `docs/TERMUX.md`: bagian mpv.conf / input.conf — menjelaskan bahwa config mpv
+  Termux tidak dipakai, config mpv-android ada di
+  `Android/data/is.xyz.mpv/files/`, dan intent tidak bisa membawa argumen mpv
+  per-file (UA/Referer/cache harus di config aplikasi). README ikut diperbarui.
+
 ## [0.4.0] - 2026-11-15
 
 ### Ditambahkan

@@ -100,6 +100,49 @@ Jika semuanya gagal, banner error menampilkan daftar percobaan + exit code.
 Catatan: aplikasi player berjalan di luar Termux; TUI boleh ditutup setelah video
 mulai diputar. HLS diputar oleh player Android (bukan relay di Termux).
 
+## 5. mpv.conf / input.conf — perlu diubah?
+
+**Singkat: tidak wajib, dan `~/.config/mpv/mpv.conf` di Termux tidak dipakai** oleh
+anicli. Di Termux, anicli **tidak men-spawn `mpv`** (paket Termux itu tanpa GUI); URL
+diserahkan ke aplikasi Android lewat intent. Jadi konfigurasi mpv Termux/`input.conf`
+tidak berpengaruh ke playback anicli.
+
+Yang relevan adalah **config milik mpv-android**, di:
+`/storage/emulated/0/Android/data/is.xyz.mpv/files/mpv.conf`
+(bisa diedit dari menu aplikasi → *Advanced* → *Edit mpv.conf*; `input.conf` ada di
+folder yang sama untuk gesture/tombol di dalam player).
+
+Kenapa perlu diubah? Intent `VIEW` **tidak bisa membawa argumen mpv per-file**, jadi
+opsi yang biasanya dikirim anicli di desktop (`--force-media-title`, `--user-agent`,
+`--referrer`, `--cache`, `--ytdl`) **tidak ikut** ke Android. Kalau CDN menolak,
+tambahkan di mpv-android:
+
+```ini
+# mpv-android: /storage/emulated/0/Android/data/is.xyz.mpv/files/mpv.conf
+user-agent=Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36
+cache=yes
+cache-secs=30
+demuxer-max-bytes=150MiB
+```
+
+Header Referer bersifat **global** — hanya tambahkan bila kamu tahu source yang
+dipakai membutuhkannya, dan hapus lagi kalau source lain jadi rusak:
+
+```ini
+# contoh; ganti host sesuai source. Global untuk semua playback!
+http-header-fields="Referer: https://samehadaku.example/"
+```
+
+`input.conf` **tidak perlu diubah** untuk anicli: itu hanya pemetaan tombol di dalam
+mpv-android (gesture, tombol TV), bukan keybinding TUI anicli.
+
+Di desktop sebaliknya: mpv membaca `mpv.conf`/`input.conf` sendiri dan anicli
+menambahkan argumen CLI yang menimpa sebagian opsi
+(`--force-media-title`, `--user-agent`, `--referrer`, `--cache`, `--ytdl`), jadi
+tidak ada yang wajib diubah. Tambahan argumen bisa lewat `[playback] extra_args`.
+
+Untuk VLC Android: tidak ada file config yang perlu diubah; atur di menu aplikasi.
+
 ## 5. Troubleshooting
 
 | Gejala | Sebab / solusi |

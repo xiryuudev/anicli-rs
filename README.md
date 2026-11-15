@@ -150,7 +150,13 @@ anicli                            # press p on a stream -> opens mpv-android
 - Launch order: `am start` intent (+ `-p is.xyz.mpv` / `-p org.videolan.vlc` when
   preferred) → `termux-am` → `termux-open` → `termux-open-url`.
 - Set the player with `[playback] android_player = "mpv" | "vlc" | "auto"`.
-- Full walkthrough + troubleshooting: **[docs/TERMUX.md](docs/TERMUX.md)**.
+- Full walkthrough + troubleshooting, plus what (not) to change in `mpv.conf` /
+  `input.conf`: **[docs/TERMUX.md](docs/TERMUX.md)**.
+
+> On Termux the app does **not** spawn `mpv`; it sends an intent to mpv-android. Your
+> Termux `~/.config/mpv/mpv.conf` and `input.conf` are therefore unused. If a CDN
+> needs a User-Agent/Referer, set it in **mpv-android's own** `mpv.conf`
+> (`Android/data/is.xyz.mpv/files/mpv.conf`) — intent cannot pass per-file mpv args.
 
 ## Configuration
 

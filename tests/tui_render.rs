@@ -270,6 +270,17 @@ fn streams_screen_marks_direct_links() {
     assert!(text.contains("IceFile"), "{text}");
 }
 
+#[tokio::test]
+async fn android_launch_is_not_reported_as_finished() {
+    let mut app = app();
+    app.handle_event(ui::AppEvent::PlayerLaunched {
+        program: "termux-open".to_string(),
+    });
+    assert!(app.status.contains("dibuka di"));
+    assert!(!app.status.contains("selesai"));
+    assert!(!app.player_running);
+}
+
 #[test]
 fn error_banner_is_visible() {
     let mut app = app();

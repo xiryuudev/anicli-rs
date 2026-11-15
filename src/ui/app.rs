@@ -97,6 +97,10 @@ pub enum AppEvent {
         code: Option<i32>,
         stderr: String,
     },
+    /// Di Android: intent berhasil dikirim; playback terjadi di aplikasi lain.
+    PlayerLaunched {
+        program: String,
+    },
     DownloadStarted {
         job: u64,
         path: PathBuf,
@@ -1141,15 +1145,7 @@ impl App {
                     .await;
                     match result {
                         Ok(Ok(program)) => {
-                            let _ = tx.send(AppEvent::PlayerStarted {
-                                job,
-                                program: program.clone(),
-                            });
-                            let _ = tx.send(AppEvent::PlayerExited {
-                                program,
-                                code: Some(0),
-                                stderr: String::new(),
-                            });
+                            let _ = tx.send(AppEvent::PlayerLaunched { program });
                         }
                         Ok(Err(message)) => {
                             let _ = tx.send(AppEvent::Failed {
@@ -1365,6 +1361,14 @@ impl App {
                 }
                 self.status = "unduhan gagal".to_string();
                 self.error = Some(format!("unduhan gagal: {message}"));
+            }
+            AppEvent::PlayerLaunched { program } => {
+                self.player_running = false;
+                self.error = None;
+                self.player_status = format!("dibuka di {program}");
+                self.status = format!(
+                    "▶ dibuka di {program} — putar di aplikasi Android; kembali ke anicli kapan saja"
+                );
             }
             AppEvent::PlayerStarted { job, program } => {
                 if job != self.job {
