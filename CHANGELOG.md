@@ -4,6 +4,14 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.1.4] - 2026-11-15
+
+### Diperbaiki
+
+- Windows CI: refaktor finalisasi tulisan atomik ke helper `finalize_write`
+  (menghilangkan `needless_return` yang membuat clippy Windows merah). Perilaku
+  retry + fallback copy tetap sama dengan 0.1.3.
+
 ## [0.1.3] - 2026-11-15
 
 ### Diperbaiki

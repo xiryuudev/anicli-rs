@@ -762,6 +762,37 @@ pub fn validate(config: &Config) -> Result<Vec<String>, ConfigError> {
 // Penulisan atomik
 // =============================================================================
 
+#[cfg(windows)]
+/// Ganti file tujuan dengan aman di Windows.
+///
+/// `rename` bisa gagal sementara (`Access is denied`) karena file baru masih
+/// dipindai antivirus/Defender, dan tidak bisa menimpa file tujuan yang ada.
+/// Strategi: hapus tujuan, retry rename dengan backoff, fallback salin isi.
+fn finalize_write(tmp: &Path, path: &Path) -> std::io::Result<()> {
+    if path.exists() {
+        let _ = std::fs::remove_file(path);
+    }
+    let mut last_error = None;
+    for attempt in 0..8 {
+        match std::fs::rename(tmp, path) {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                last_error = Some(err);
+                let _ = std::fs::remove_file(path);
+                std::thread::sleep(std::time::Duration::from_millis(40 * (attempt + 1)));
+            }
+        }
+    }
+    std::fs::copy(tmp, path).map_err(|err| last_error.unwrap_or(err))?;
+    let _ = std::fs::remove_file(tmp);
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn finalize_write(tmp: &Path, path: &Path) -> std::io::Result<()> {
+    std::fs::rename(tmp, path)
+}
+
 pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), ConfigError> {
     let Some(parent) = path.parent() else {
         return Err(ConfigError::Write {
@@ -787,35 +818,7 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), ConfigErro
         // Tutup handle SEBELUM rename: Windows menolak memindahkan file yang masih
         // dibuka tanpa FILE_SHARE_DELETE (Access is denied).
         drop(file);
-        // Windows: rename bisa gagal sementara (Access denied) karena file baru
-        // masih dipindai antivirus/Defender, dan rename juga tidak mengganti file
-        // tujuan yang ada. Strategi: hapus tujuan, retry rename beberapa kali,
-        // lalu fallback salin isi (lebih penting simpan berhasil daripada atomik).
-        #[cfg(windows)]
-        {
-            if path.exists() {
-                let _ = std::fs::remove_file(path);
-            }
-            let mut last_error = None;
-            for attempt in 0..8 {
-                match std::fs::rename(&tmp, path) {
-                    Ok(()) => return Ok(()),
-                    Err(err) => {
-                        last_error = Some(err);
-                        if path.exists() {
-                            let _ = std::fs::remove_file(path);
-                        }
-                        std::thread::sleep(std::time::Duration::from_millis(40 * (attempt + 1)));
-                    }
-                }
-            }
-            // Fallback terakhir: salin isi lalu hapus tmp.
-            std::fs::copy(&tmp, path).map_err(|err| last_error.unwrap_or(err))?;
-            let _ = std::fs::remove_file(&tmp);
-            return Ok(());
-        }
-        #[cfg(not(windows))]
-        std::fs::rename(&tmp, path)
+        finalize_write(&tmp, path)
     };
 
     write().map_err(|source| {
