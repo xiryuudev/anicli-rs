@@ -176,6 +176,7 @@ Untuk VLC Android: tidak ada file config yang perlu diubah; atur di menu aplikas
 | `am: not found` | `pkg install termux-tools`; sebagian ROM perlu `termux-am` dari F-Droid. |
 | Intent tidak membuka apa pun | Pasang mpv-android (`is.xyz.mpv`) dari F-Droid; coba `android_player = "auto"`. |
 | Video tidak jalan, hanya embed | `embed_strategy = "browser"`; pilih baris `direct` di layar Stream. |
+| Panic `rustls-platform-verifier ... android.rs` | Sudah diperbaiki di v0.4.3 (TLS memakai `webpki-roots` statis, bukan verifier Android). Unduh ulang binary rilis terbaru. |
 | TUI berantakan | `stty rows 40 cols 100` atau perkecil font terminal Termux. |
 | Config tidak tersimpan | v0.1.5+ sudah memperbaiki penulisan file di Windows/Android; pastikan versi terbaru. |
 
