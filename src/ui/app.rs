@@ -30,6 +30,7 @@ use crate::paths::Paths;
 use crate::player::{self, PlaybackPlan};
 use crate::resolve;
 use crate::sources::SourceRegistry;
+use crate::ui::selector::{SelectorAction, SourceEntry, SourceSelector};
 
 /// Layar aktif.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,12 +60,21 @@ pub enum BrowseTab {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum AppEvent {
-    SearchOk {
+    /// Hasil inkremental dari satu source (streaming search).
+    SearchSource {
         job: u64,
-        results: Vec<AnimeSearchResult>,
-        /// Ringkasan source yang gagal (kosong kalau semua sukses).
+        index: usize,
+        source: String,
+        items: Vec<AnimeSearchResult>,
+        error: Option<String>,
+        sources_tried: usize,
+    },
+    /// Semua source selesai merespons.
+    SearchDone {
+        job: u64,
+        sources_with_results: usize,
+        sources_tried: usize,
         errors: String,
-        sources: String,
     },
     DetailOk {
         job: u64,
@@ -160,6 +170,9 @@ pub struct App {
     pub previous_screen: Option<Screen>,
     pub source_name: String,
     pub search_scope: SearchScope,
+    pub search_slots: Vec<Option<Vec<AnimeSearchResult>>>,
+    pub search_cancel: Option<tokio::task::AbortHandle>,
+    pub selector: Option<SourceSelector>,
     pub status: String,
     pub loading: bool,
     pub error: Option<String>,
@@ -222,6 +235,9 @@ impl App {
             previous_screen: None,
             source_name: source_name.clone(),
             search_scope,
+            search_slots: Vec::new(),
+            search_cancel: None,
+            selector: None,
             status: format!("source: {source_name}"),
             loading: false,
             error: None,
@@ -292,28 +308,55 @@ impl App {
             .unwrap_or(self.config.playback.default_resolution)
     }
 
-    pub fn cycle_source(&mut self) {
-        let names = self.registry.names();
-        if names.is_empty() {
+    /// Buka popup pemilih source (tombol `s`).
+    pub fn open_source_selector(&mut self) {
+        let mut entries: Vec<SourceEntry> = Vec::new();
+        for (name, source_config) in &self.config.sources {
+            entries.push(SourceEntry {
+                name: name.clone(),
+                available: self.registry.get(name).is_some(),
+                enabled: source_config.enabled,
+            });
+        }
+        for name in self.registry.names() {
+            if !entries.iter().any(|entry| entry.name == name) {
+                entries.push(SourceEntry {
+                    name: name.to_string(),
+                    available: true,
+                    enabled: true,
+                });
+            }
+        }
+        entries.sort_by(|a, b| a.name.cmp(&b.name));
+        let count = entries.len();
+        self.selector = Some(SourceSelector::new(entries, &self.source_name));
+        self.status = format!("pilih source ({count} tersedia) · Enter pilih · Esc batal");
+    }
+
+    /// Terapkan source terpilih dari popup.
+    pub fn select_source(&mut self, name: &str) {
+        if self.registry.get(name).is_none() {
+            self.error = Some(format!(
+                "source {name:?} tidak tersedia (disabled/gagal dimuat)"
+            ));
             return;
         }
-        let position = names
-            .iter()
-            .position(|name| *name == self.source_name)
-            .unwrap_or(0);
-        let next = names[(position + 1) % names.len()];
-        self.source_name = next.to_string();
-        self.status = format!("source: {}", self.source_name);
+        self.source_name = name.to_string();
+        self.status = format!("source: {name}");
         self.error = None;
+        // Hasil lama berasal dari source lain; bersihkan supaya tidak membingungkan.
         self.results.clear();
-        self.detail = None;
-        self.target = None;
-        self.episodes.clear();
-        self.streams.clear();
-        self.attempts.clear();
-        self.screen = Screen::Search;
-        self.input_focused = true;
-        self.status.push_str(" — tekan Enter untuk mencari");
+        self.search_slots.clear();
+        self.result_index = 0;
+    }
+
+    /// Batalkan pencarian streaming yang sedang berjalan.
+    pub fn cancel_search(&mut self) {
+        if let Some(handle) = self.search_cancel.take() {
+            handle.abort();
+        }
+        self.loading = false;
+        self.status = format!("pencarian dibatalkan ({} hasil)", self.results.len());
     }
 
     /// Ganti resolusi pilihan (cycle di antara yang tersedia).
@@ -347,6 +390,24 @@ impl App {
             return;
         }
 
+        // Popup source selector menangkap semua input selama terbuka.
+        if self.selector.is_some() {
+            let action = self
+                .selector
+                .as_mut()
+                .map(|selector| selector.handle_key(key))
+                .unwrap_or(SelectorAction::Ignored);
+            match action {
+                SelectorAction::Close => self.selector = None,
+                SelectorAction::Choose(name) => {
+                    self.select_source(&name);
+                    self.selector = None;
+                }
+                SelectorAction::Ignored => {}
+            }
+            return;
+        }
+
         match key.code {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.quit = true;
@@ -361,7 +422,7 @@ impl App {
                 return;
             }
             KeyCode::Char('s') if !self.is_typing() && key.modifiers.is_empty() => {
-                self.cycle_source();
+                self.open_source_selector();
                 return;
             }
             KeyCode::Char('l') if !self.is_typing() => {
@@ -385,6 +446,10 @@ impl App {
                 return;
             }
             KeyCode::Esc => {
+                if self.loading {
+                    self.cancel_search();
+                    return;
+                }
                 if self.screen == Screen::Help {
                     self.screen = self.previous_screen.unwrap_or(Screen::Search);
                 } else if self.screen == Screen::Search && self.is_typing() {
@@ -586,38 +651,106 @@ impl App {
         self.error = None;
         self.results.clear();
         self.result_index = 0;
-        self.status = format!("mencari {:?} di {}…", query, source.name());
+        self.input_focused = false;
 
-        let service = self.service.clone();
         let order = if self.search_scope == SearchScope::Selected {
             vec![self.source_name.clone()]
         } else {
             self.fallback_order()
         };
-        let tx = tx.clone();
+        self.search_slots = vec![None; order.len()];
         self.status = format!(
             "mencari {:?} di {} ({})…",
             query,
             source.name(),
             self.search_scope
         );
-        tokio::spawn(async move {
-            let order_refs: Vec<&str> = order.iter().map(String::as_str).collect();
-            let outcome = service.search_all(&query, &order_refs).await;
-            let errors = outcome
-                .errors
-                .iter()
-                .map(|(name, error)| format!("{name} ✗ {}", error.user_message()))
-                .collect::<Vec<_>>()
-                .join(" · ");
-            let sources = format!("{}/{}", outcome.sources_with_results, outcome.sources_tried);
-            let _ = tx.send(AppEvent::SearchOk {
-                job,
-                results: outcome.results,
-                errors,
-                sources,
+
+        let service = self.service.clone();
+        let tx = tx.clone();
+        let coordinator = tokio::spawn(async move {
+            let (local_tx, mut local_rx) = mpsc::unbounded_channel();
+            let query = query.clone();
+            let order = order.clone();
+            let search = tokio::spawn(async move {
+                let order_refs: Vec<&str> = order.iter().map(String::as_str).collect();
+                service
+                    .search_streaming(&query, &order_refs, local_tx)
+                    .await;
             });
+
+            while let Some(event) = local_rx.recv().await {
+                match event {
+                    crate::fallback::StreamSearchEvent::Source {
+                        index,
+                        source,
+                        found,
+                        error,
+                    } => {
+                        let _ = tx.send(AppEvent::SearchSource {
+                            job,
+                            index,
+                            source,
+                            items: found,
+                            error: error.map(|error| error.user_message()),
+                            sources_tried: 0,
+                        });
+                    }
+                    crate::fallback::StreamSearchEvent::Done { sources_tried } => {
+                        let _ = tx.send(AppEvent::SearchDone {
+                            job,
+                            sources_with_results: 0,
+                            sources_tried,
+                            errors: String::new(),
+                        });
+                        break;
+                    }
+                }
+            }
+            let _ = search.await;
         });
+        self.search_cancel = Some(coordinator.abort_handle());
+    }
+
+    /// Gabungkan hasil per slot source (urutan prioritas), dedupe judul.
+    fn rebuild_search_results(&mut self) {
+        let mut merged: Vec<AnimeSearchResult> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for slot in &self.search_slots {
+            let Some(items) = slot else {
+                continue;
+            };
+            for item in items {
+                let key = crate::sources::util::normalize_title(&item.title);
+                if key.is_empty() || !seen.insert(key) {
+                    continue;
+                }
+                merged.push(item.clone());
+            }
+        }
+        self.results = merged;
+        if self.result_index >= self.results.len() {
+            self.result_index = self.results.len().saturating_sub(1);
+        }
+    }
+
+    fn search_breakdown(&self) -> String {
+        let mut counts: Vec<(String, usize)> = Vec::new();
+        for item in &self.results {
+            let name = item.source.as_str().to_string();
+            match counts.iter_mut().find(|(existing, _)| *existing == name) {
+                Some((_, total)) => *total += 1,
+                None => counts.push((name, 1)),
+            }
+        }
+        if counts.is_empty() {
+            return "belum ada hasil".to_string();
+        }
+        counts
+            .iter()
+            .map(|(name, total)| format!("{name} {total}"))
+            .collect::<Vec<_>>()
+            .join(" · ")
     }
 
     fn open_detail(&mut self, tx: &UnboundedSender<AppEvent>) {
@@ -1263,40 +1396,90 @@ impl App {
     /// Terapkan hasil job (abaikan hasil job basi).
     pub fn handle_event(&mut self, event: AppEvent) {
         match event {
-            AppEvent::SearchOk {
+            AppEvent::SearchSource {
                 job,
-                results,
-                errors,
-                sources,
+                index,
+                source,
+                items,
+                error,
+                sources_tried,
             } => {
                 if job != self.job {
                     return;
                 }
-                self.loading = false;
-                let count = results.len();
-                self.results = results;
-                self.result_index = 0;
-                self.input_focused = self.results.is_empty();
-                self.attempts = errors.clone();
-                let mut counts: Vec<(String, usize)> = Vec::new();
-                for item in &self.results {
-                    let name = item.source.as_str().to_string();
-                    match counts.iter_mut().find(|(existing, _)| *existing == name) {
-                        Some((_, total)) => *total += 1,
-                        None => counts.push((name, 1)),
+                let _ = sources_tried;
+                if let Some(slot) = self.search_slots.get_mut(index) {
+                    *slot = Some(items);
+                }
+                if let Some(message) = error {
+                    if !self.attempts.contains(&source) {
+                        let line = format!("{source} ✗ {message}");
+                        self.attempts = if self.attempts.is_empty() {
+                            line
+                        } else {
+                            format!("{} · {line}", self.attempts)
+                        };
                     }
                 }
-                let breakdown = counts
+                self.rebuild_search_results();
+                let responded = self
+                    .search_slots
                     .iter()
-                    .map(|(name, total)| format!("{name} {total}"))
-                    .collect::<Vec<_>>()
-                    .join(" · ");
-                self.status = if errors.is_empty() {
-                    format!("{count} hasil ({sources} source) · {breakdown}")
-                } else {
-                    format!("{count} hasil ({sources} source) · {breakdown} · {errors}")
-                };
+                    .filter(|slot| slot.is_some())
+                    .count();
+                self.status = format!(
+                    "{}/{} hasil ({} dari {} source merespons)…",
+                    self.results.len(),
+                    self.results.len(),
+                    responded,
+                    self.search_slots.len()
+                );
                 self.screen = Screen::Search;
+            }
+            AppEvent::SearchDone {
+                job,
+                sources_tried,
+                sources_with_results,
+                errors,
+            } => {
+                if job != self.job {
+                    return;
+                }
+                let _ = (sources_tried, sources_with_results);
+                self.loading = false;
+                self.search_cancel = None;
+                if self.results.is_empty() {
+                    self.input_focused = true;
+                }
+                if !errors.is_empty() {
+                    self.attempts = errors;
+                }
+                let breakdown = self.search_breakdown();
+                let count = self.results.len();
+                let errored = self
+                    .attempts
+                    .split(" · ")
+                    .filter(|part| part.contains('✗'))
+                    .count();
+                let scope_note = if self.search_scope == SearchScope::Selected {
+                    format!("{}", self.search_scope)
+                } else {
+                    format!(
+                        "{}/{} source",
+                        self.search_slots.iter().filter(|s| s.is_some()).count(),
+                        self.search_slots.len()
+                    )
+                };
+                self.status = format!("{count} hasil ({scope_note}) · {breakdown}");
+                if errored > 0 {
+                    self.status.push_str(&format!(" · {errored} source error"));
+                }
+                if count == 0 {
+                    self.error = Some(
+                        "tidak ada hasil. Coba kata kunci lain, atau tekan S untuk cari di semua source."
+                            .to_string(),
+                    );
+                }
             }
             AppEvent::DetailOk { job, detail } => {
                 if job != self.job {

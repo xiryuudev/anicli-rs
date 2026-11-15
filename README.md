@@ -18,9 +18,14 @@ play — with automatic fallback between sources when one fails.
 - **7 sources** with a shared trait (`AnimeSource`), so a new site is a small module.
 - **Cross-source fallback** based on *identity* (title + episode number), not URLs:
   if a source fails, the app tries the next one from your fallback order.
-- **Parallel search** with title de-duplication, a `[source]` badge on every result,
-  per-source result/error summary, and an `S` toggle to search **only the active
-  source** (`general.search_scope = "all" | "selected"`).
+- **Streaming search**: results appear per source as soon as that source responds
+  (no waiting for the slowest), merged in priority order with title de-duplication,
+  a `[source]` badge on every result, per-source error summary, and an `S` toggle to
+  search **only the active source** (`general.search_scope = "all" | "selected"`).
+  `Esc` while searching cancels all in-flight source tasks.
+- **Source selector**: `s` opens a filterable popup listing every configured source
+  (active `●`, enabled `○`, disabled/unavailable), keyboard driven.
+- Results keep a deterministic order: the active source is always first.
 - **Resolution selection**: exact or nearest resolution, HLS/MP4 direct links, and
   `Embed` links played through `yt-dlp` or opened in the browser.
 - **Player integration**: `mpv` or `vlc`, headers (User-Agent/Referer), `--start`,
@@ -123,7 +128,7 @@ Data (history, bookmarks) and logs live next to it in the data directory
 | `j` / `k`, `↓` / `↑` | Move selection |
 | `p` | Play highlighted stream (mpv/vlc) — or start/browse a download |
 | `r` | Pick resolution (highlight follows) |
-| `s` | Change source |
+| `s` | Open source selector (type to filter, Enter to choose) |
 | `S` | Toggle search scope: all sources / active source only |
 | `l` | Browse (ongoing/completed) |
 | `H` | History |

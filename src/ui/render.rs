@@ -39,6 +39,91 @@ pub fn render(frame: &mut Frame, app: &App) {
     }
 
     render_footer(frame, app, chunks[2]);
+
+    if app.selector.is_some() {
+        render_source_selector(frame, app, area);
+    }
+}
+
+/// Popup pemilih source: filter + daftar source + status.
+fn render_source_selector(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(selector) = &app.selector else {
+        return;
+    };
+    let width = area.width.saturating_mul(6) / 10;
+    let height = area.height.saturating_mul(7) / 10;
+    let popup = Rect {
+        x: area.x + (area.width.saturating_sub(width)) / 2,
+        y: area.y + (area.height.saturating_sub(height)) / 2,
+        width: width.max(40),
+        height: height.max(8),
+    };
+    frame.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(theme::accent())
+        .title(" Pilih source — ketik untuk filter · Enter pilih · Esc batal ");
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(2), Constraint::Min(1)])
+        .split(inner);
+
+    let filter_line = Line::from(vec![
+        Span::styled("> ", theme::accent()),
+        Span::raw(selector.filter.clone()),
+        Span::styled("█", theme::accent()),
+    ]);
+    frame.render_widget(Paragraph::new(filter_line), chunks[0]);
+
+    let filtered = selector.filtered();
+    if filtered.is_empty() {
+        frame.render_widget(
+            Paragraph::new(selector.empty_message()).style(theme::dim()),
+            chunks[1],
+        );
+        return;
+    }
+
+    let active = app.source_name.as_str();
+    let items: Vec<ListItem<'_>> = filtered
+        .iter()
+        .map(|entry| {
+            let (marker, style) = if !entry.available {
+                ("✗", theme::error())
+            } else if entry.name == active {
+                ("●", theme::success())
+            } else if entry.enabled {
+                ("○", theme::base())
+            } else {
+                ("○", theme::dim())
+            };
+            let note = if !entry.available {
+                "  (tidak tersedia)"
+            } else if !entry.enabled {
+                "  (disabled)"
+            } else {
+                ""
+            };
+            ListItem::new(Line::from(vec![
+                Span::styled(format!(" {marker} "), style),
+                Span::styled(entry.name.clone(), style),
+                Span::styled(note, theme::dim()),
+            ]))
+        })
+        .collect();
+
+    let list = List::new(items)
+        .highlight_style(theme::highlight())
+        .highlight_symbol("▶ ");
+    frame.render_stateful_widget(
+        list,
+        chunks[1],
+        &mut ratatui::widgets::ListState::default().with_selected(Some(selector.index)),
+    );
 }
 
 fn render_header(frame: &mut Frame, app: &App, area: Rect) {
@@ -561,7 +646,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         Line::from("  /  atau Tab    fokus input pencarian"),
         Line::from("  Enter          cari / buka detail / pilih"),
         Line::from("  j k / ↑ ↓      navigasi daftar"),
-        Line::from("  s              ganti source"),
+        Line::from("  s              buka pemilih source (filter + Enter)"),
         Line::from("  S              cakupan cari: semua source / source aktif"),
         Line::from("  Esc            kembali / lepas fokus"),
         Line::from("  q              keluar (saat tidak mengetik)"),

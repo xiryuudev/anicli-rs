@@ -82,6 +82,20 @@ pub struct ResolvedEpisodes {
     pub attempts: Vec<Attempt>,
 }
 
+/// Event pencarian streaming (dikirim per source begitu selesai).
+#[derive(Debug)]
+pub enum StreamSearchEvent {
+    /// Hasil satu source (bisa kosong) atau errornya.
+    Source {
+        index: usize,
+        source: String,
+        found: Vec<AnimeSearchResult>,
+        error: Option<SourceError>,
+    },
+    /// Semua source sudah merespons.
+    Done { sources_tried: usize },
+}
+
 /// Hasil pencarian paralel lintas source (DESIGN §10.6).
 #[derive(Debug, Clone, Default)]
 pub struct SearchOutcome {
@@ -332,7 +346,8 @@ impl PlaybackService {
     /// Hasil didedupe berdasarkan judul ternormalisasi: sumber pertama dalam `order`
     /// menang supaya preferensi user dihormati. Error per source tetap dikumpulkan
     /// untuk ditampilkan sebagai peringatan.
-    pub async fn search_all(&self, query: &str, order: &[&str]) -> SearchOutcome {
+    /// Daftar source untuk pencarian sesuai `order` (fallback ke semua yang enabled).
+    fn search_sources(&self, order: &[&str]) -> Vec<Arc<dyn AnimeSource>> {
         let mut sources: Vec<Arc<dyn AnimeSource>> = Vec::new();
         for name in order {
             if let Some(source) = self.registry.get(name) {
@@ -350,7 +365,64 @@ impl PlaybackService {
                 }
             }
         }
+        sources
+    }
 
+    /// Pencarian paralel **streaming**: tiap source mengirim hasilnya sendiri
+    /// begitu selesai. Task ini memiliki `JoinSet`; abort task (mis. `Esc`) ikut
+    /// membatalkan seluruh pencarian source.
+    pub async fn search_streaming(
+        &self,
+        query: &str,
+        order: &[&str],
+        tx: tokio::sync::mpsc::UnboundedSender<StreamSearchEvent>,
+    ) {
+        let sources = self.search_sources(order);
+        let sources_tried = sources.len();
+
+        let mut set: tokio::task::JoinSet<(
+            usize,
+            String,
+            Result<Vec<AnimeSearchResult>, SourceError>,
+        )> = tokio::task::JoinSet::new();
+        for (index, source) in sources.into_iter().enumerate() {
+            let query = query.to_string();
+            let timeout = self.attempt_timeout;
+            set.spawn(async move {
+                tokio::time::sleep(Duration::from_millis(120 * index as u64)).await;
+                let site = source.name();
+                let outcome = match tokio::time::timeout(timeout, source.search(&query)).await {
+                    Ok(Ok(results)) => Ok(results),
+                    Ok(Err(error)) => Err(error),
+                    Err(_) => Err(SourceError::Timeout {
+                        site,
+                        step: "search",
+                    }),
+                };
+                (index, site.to_string(), outcome)
+            });
+        }
+
+        while let Some(joined) = set.join_next().await {
+            let Ok((index, source, outcome)) = joined else {
+                continue;
+            };
+            let (found, error) = match outcome {
+                Ok(found) => (found, None),
+                Err(error) => (Vec::new(), Some(error)),
+            };
+            let _ = tx.send(StreamSearchEvent::Source {
+                index,
+                source,
+                found,
+                error,
+            });
+        }
+        let _ = tx.send(StreamSearchEvent::Done { sources_tried });
+    }
+
+    pub async fn search_all(&self, query: &str, order: &[&str]) -> SearchOutcome {
+        let sources = self.search_sources(order);
         let sources_tried = sources.len();
         let mut dedupe: HashSet<String> = HashSet::new();
         let mut results: Vec<AnimeSearchResult> = Vec::new();

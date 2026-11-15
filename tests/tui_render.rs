@@ -401,18 +401,28 @@ fn keyboard_navigation_moves_selection_and_pops_screens() {
 }
 
 #[test]
-fn source_cycling_changes_active_source() {
+fn source_selector_replaces_sequential_cycling() {
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let mut app = app();
-    // `s` hanya mengganti source saat tidak sedang mengetik (di input, huruf s = teks).
-    app.input_focused = false;
-    assert_eq!(app.source_name, "samehadaku");
+    // `s` membuka popup (bukan siklus). Di input, huruf s tetap teks.
+    app.input_focused = true;
     app.handle_input(key(KeyCode::Char('s')), &tx);
+    assert!(app.selector.is_none(), "saat mengetik, s = teks");
+    assert_eq!(app.search_input, "s");
+
+    app.search_input.clear();
+    app.input_focused = false;
+    app.handle_input(key(KeyCode::Char('s')), &tx);
+    assert!(app.selector.is_some(), "s membuka popup");
+    assert_eq!(app.source_name, "samehadaku", "belum berubah sebelum Enter");
+
+    // Pilih otakudesu lewat filter + Enter.
+    for ch in "otaku".chars() {
+        app.handle_input(key(KeyCode::Char(ch)), &tx);
+    }
+    app.handle_input(key(KeyCode::Enter), &tx);
     assert_eq!(app.source_name, "otakudesu");
-    // Setelah berganti source fokus kembali ke input; lepas dulu untuk menekan `s` lagi.
-    app.input_focused = false;
-    app.handle_input(key(KeyCode::Char('s')), &tx);
-    assert_eq!(app.source_name, "samehadaku");
+    assert!(app.selector.is_none());
 }
 
 #[test]
@@ -451,22 +461,121 @@ fn typing_updates_search_input_only_when_focused() {
 fn stale_job_results_are_ignored() {
     let mut app = app();
     app.job = 7;
-    app.handle_event(ui::AppEvent::SearchOk {
+    app.search_slots = vec![None];
+    app.handle_event(ui::AppEvent::SearchSource {
         job: 6,
-        results: vec![sample_result("basi", AiringStatus::Ongoing)],
-        errors: String::new(),
-        sources: "1/1".into(),
+        index: 0,
+        source: "samehadaku".into(),
+        items: vec![sample_result("basi", AiringStatus::Ongoing)],
+        error: None,
+        sources_tried: 1,
     });
     assert!(app.results.is_empty(), "hasil job lama tidak boleh dipakai");
 
-    app.handle_event(ui::AppEvent::SearchOk {
+    app.handle_event(ui::AppEvent::SearchSource {
         job: 7,
-        results: vec![sample_result("segar", AiringStatus::Ongoing)],
-        errors: String::new(),
-        sources: "1/1".into(),
+        index: 0,
+        source: "samehadaku".into(),
+        items: vec![sample_result("segar", AiringStatus::Ongoing)],
+        error: None,
+        sources_tried: 1,
     });
     assert_eq!(app.results.len(), 1);
+    app.handle_event(ui::AppEvent::SearchDone {
+        job: 7,
+        sources_with_results: 1,
+        sources_tried: 1,
+        errors: String::new(),
+    });
     assert!(!app.loading);
+}
+
+#[test]
+fn streaming_results_merge_in_priority_order_with_dedupe() {
+    let mut app = app();
+    app.job = 3;
+    app.search_slots = vec![None, None];
+    // Source kedua (prioritas lebih rendah) selesai lebih dulu.
+    app.handle_event(ui::AppEvent::SearchSource {
+        job: 3,
+        index: 1,
+        source: "otakudesu".into(),
+        items: vec![
+            sample_result("One Piece", AiringStatus::Ongoing),
+            sample_result("Bleach", AiringStatus::Ongoing),
+        ],
+        error: None,
+        sources_tried: 2,
+    });
+    assert_eq!(app.results.len(), 2);
+    // Source prioritas pertama tiba: judul duplikat dibuang, hasilnya di depan.
+    app.handle_event(ui::AppEvent::SearchSource {
+        job: 3,
+        index: 0,
+        source: "samehadaku".into(),
+        items: vec![sample_result("One Piece", AiringStatus::Ongoing)],
+        error: None,
+        sources_tried: 2,
+    });
+    assert_eq!(app.results.len(), 2, "dedupe judul harus tetap jalan");
+    assert_eq!(app.results[0].source.as_str(), "samehadaku");
+}
+
+#[test]
+fn source_selector_opens_filters_and_selects() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = app();
+    app.screen = ui::Screen::Search;
+    app.input_focused = false;
+
+    app.handle_input(key(KeyCode::Char('s')), &tx);
+    let selector = app.selector.as_ref().expect("popup terbuka");
+    assert!(!selector.entries.is_empty());
+    assert!(selector
+        .entries
+        .iter()
+        .any(|entry| entry.name == "samehadaku"));
+
+    // Filter: ketik "same" → hanya samehadaku.
+    for ch in "same".chars() {
+        app.handle_input(key(KeyCode::Char(ch)), &tx);
+    }
+    let selector = app.selector.as_ref().unwrap();
+    let filtered: Vec<&str> = selector
+        .filtered()
+        .iter()
+        .map(|e| e.name.as_str())
+        .collect();
+    assert_eq!(filtered, vec!["samehadaku"]);
+
+    // Enter memilih source dan menutup popup.
+    app.handle_input(key(KeyCode::Enter), &tx);
+    assert!(app.selector.is_none());
+    assert_eq!(app.source_name, "samehadaku");
+
+    // Esc menutup tanpa mengubah source.
+    app.handle_input(key(KeyCode::Char('s')), &tx);
+    assert!(app.selector.is_some());
+    app.handle_input(key(KeyCode::Esc), &tx);
+    assert!(app.selector.is_none());
+    assert_eq!(app.source_name, "samehadaku");
+}
+
+#[test]
+fn source_selector_filters_no_match_message() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = app();
+    app.screen = ui::Screen::Search;
+    app.input_focused = false;
+    app.handle_input(key(KeyCode::Char('s')), &tx);
+    for ch in "zzz".chars() {
+        app.handle_input(key(KeyCode::Char(ch)), &tx);
+    }
+    let selector = app.selector.as_ref().unwrap();
+    assert_eq!(selector.empty_message(), "Tidak ada source yang cocok");
+    assert!(selector.filtered().is_empty());
+    let text = render_text(&app, 100, 30);
+    assert!(text.contains("Tidak ada source yang cocok"), "{text}");
 }
 
 #[test]

@@ -4,6 +4,29 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.5.0] - 2026-11-16
+
+### Ditambahkan
+
+- **Streaming search**: hasil pencarian muncul **per source** begitu source itu
+  merespons, tidak menunggu yang paling lambat. Event baru
+  `SearchSource`/`SearchDone`; penggabungan tetap deterministik (urutan prioritas,
+  source aktif di depan) dan dedupe judul tetap berjalan. Progres "x/y source
+  merespons" tampil di status, error per source dicatat tanpa menghentikan source lain.
+- **Batalkan pencarian**: `Esc` saat pencarian berjalan meng-abort task koordinator
+  (JoinSet ikut membatalkan semua task source).
+- **Source selector** (`s`): popup berisi semua source dari config (aktif `●`, enabled
+  `○`, disabled/tidak tersedia) dengan **filter teks** (case-insensitive), navigasi
+  panah / j-k saat filter kosong, `Enter` memilih, `Esc` batal. Menggantikan siklus
+  source berurutan; `S` (uppercase) tetap toggle search scope.
+- Test: urutan merge streaming + dedupe, filter/navigasi/select popup, pesan kosong,
+  stale job, dan `s` tidak lagi siklus.
+
+### Diubah
+
+- `s` sekarang membuka popup (bukan siklus). Di input pencarian, huruf `s` tetap teks.
+- README/help diperbarui.
+
 ## [0.4.5] - 2026-11-15
 
 ### Diperbaiki

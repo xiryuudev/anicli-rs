@@ -10,7 +10,9 @@
 
 pub mod app;
 pub mod render;
+pub mod selector;
 pub mod theme;
 
 pub use app::{run, App, AppEvent, DownloadState, Screen};
 pub use render::render;
+pub use selector::{SelectorAction, SourceEntry, SourceSelector};
