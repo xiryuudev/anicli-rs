@@ -168,7 +168,7 @@ jobs:
       - name: Release build (arm64-v8a, API 24)
         run: |
           set -euo pipefail
-          cargo ndk -t arm64-v8a -p 24 build --release --locked
+          cargo ndk -t arm64-v8a --platform 24 build --release --locked
 
       - name: Verify ELF (aarch64 + linker64)
         run: |
