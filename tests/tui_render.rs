@@ -362,7 +362,8 @@ fn help_overlay_documents_keymap() {
 
     let text = render_text(&app, 100, 26);
     assert!(text.contains("bantuan"), "{text}");
-    assert!(text.contains("ganti source"), "{text}");
+    assert!(text.contains("pemilih source"), "{text}");
+    assert!(text.contains("cakupan cari"), "{text}");
     assert!(text.contains("navigasi daftar"), "{text}");
 }
 
