@@ -65,11 +65,15 @@ pub struct GeneralConfig {
     pub default_source: String,
     pub fallback_order: Vec<String>,
     pub language: String,
+    /// Cakupan pencarian (bisa diubah dengan tombol `S` di layar Cari).
+    #[serde(default)]
+    pub search_scope: SearchScope,
 }
 
 impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
+            search_scope: SearchScope::All,
             default_source: "samehadaku".to_string(),
             fallback_order: vec![
                 "samehadaku".to_string(),
@@ -153,6 +157,26 @@ impl fmt::Display for EmbedStrategy {
             Self::Skip => "skip",
         };
         f.write_str(text)
+    }
+}
+
+/// Cakupan pencarian: semua source aktif, atau hanya source yang dipilih.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchScope {
+    /// Cari paralel di semua source aktif (fallback order).
+    #[default]
+    All,
+    /// Hanya source yang sedang aktif (tab atas).
+    Selected,
+}
+
+impl std::fmt::Display for SearchScope {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::All => write!(formatter, "semua source"),
+            Self::Selected => write!(formatter, "source aktif"),
+        }
     }
 }
 

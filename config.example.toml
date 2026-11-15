@@ -179,6 +179,8 @@ to_stderr = false
 # =============================================================================
 # Player Android/Termux: "auto" (intent VIEW biasa), "mpv", atau "vlc".
 android_player = "auto"
+# "all" = cari di semua source aktif; "selected" = hanya source aktif.
+search_scope = "all"
 
 
 [sources.samehadaku]

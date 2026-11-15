@@ -130,7 +130,10 @@ fn render_search(frame: &mut Frame, app: &App, area: Rect) {
         .results
         .iter()
         .map(|result| {
-            let mut spans = vec![Span::raw(result.title.clone())];
+            let mut spans = vec![
+                Span::styled(format!("[{}] ", result.source.as_str()), theme::accent()),
+                Span::raw(result.title.clone()),
+            ];
             if let Some(status) = result.status {
                 spans.push(Span::styled(format!("  [{status:?}]"), theme::dim()));
             }
@@ -171,8 +174,10 @@ fn render_detail(frame: &mut Frame, app: &App, area: Rect) {
         detail.title.clone(),
         theme::title(),
     )));
-    lines.push(Line::from(""));
     lines.push(Line::from(vec![
+        Span::styled("Source: ", theme::dim()),
+        Span::styled(detail.source.as_str().to_string(), theme::accent()),
+        Span::raw("   "),
         Span::styled("Status: ", theme::dim()),
         Span::raw(format!("{:?}", detail.status)),
         Span::raw("   "),
@@ -553,6 +558,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         Line::from("  Enter          cari / buka detail / pilih"),
         Line::from("  j k / ↑ ↓      navigasi daftar"),
         Line::from("  s              ganti source"),
+        Line::from("  S              cakupan cari: semua source / source aktif"),
         Line::from("  Esc            kembali / lepas fokus"),
         Line::from("  q              keluar (saat tidak mengetik)"),
         Line::from("  Ctrl+C         keluar kapan saja"),
@@ -579,7 +585,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled(format!(" {} ", app.status), theme::base()),
         Span::raw("  "),
         Span::styled(
-            "p putar · r resolusi · l browse · H riwayat · B bookmark · L log · g setting · ? bantuan",
+            "p putar · r resolusi · S cakupan · l browse · H riwayat · B bookmark · L log · ? bantuan",
             theme::dim(),
         ),
     ])];

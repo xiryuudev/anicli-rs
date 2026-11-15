@@ -281,6 +281,45 @@ async fn android_launch_is_not_reported_as_finished() {
     assert!(!app.player_running);
 }
 
+#[tokio::test]
+async fn search_results_show_source_badge() {
+    let mut app = app();
+    app.input_focused = false;
+    app.results = vec![sample_result("One Piece", AiringStatus::Ongoing)];
+    let text = render_text(&app, 100, 30);
+    assert!(
+        text.contains("[samehadaku]"),
+        "badge source hilang:\n{text}"
+    );
+}
+
+#[tokio::test]
+async fn detail_screen_shows_origin_source() {
+    let mut app = app();
+    app.detail = Some(sample_detail());
+    app.screen = ui::Screen::Detail;
+    let text = render_text(&app, 120, 40);
+    assert!(text.contains("Source:"), "label Source hilang");
+    assert!(text.contains("samehadaku"));
+}
+
+#[tokio::test]
+async fn search_scope_can_be_toggled() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = app();
+    app.input_focused = false;
+    app.screen = ui::Screen::Search;
+    app.handle_input(key(KeyCode::Char('S')), &tx);
+    assert!(
+        app.status.contains("cakupan pencarian"),
+        "status: {}",
+        app.status
+    );
+    assert_eq!(app.search_scope, anicli_rs::config::SearchScope::Selected);
+    app.handle_input(key(KeyCode::Char('S')), &tx);
+    assert_eq!(app.search_scope, anicli_rs::config::SearchScope::All);
+}
+
 #[test]
 fn error_banner_is_visible() {
     let mut app = app();

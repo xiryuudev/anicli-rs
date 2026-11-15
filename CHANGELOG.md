@@ -4,6 +4,28 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.4.4] - 2026-11-15
+
+### Diperbaiki
+
+- **Kusonime batch/BD tidak bisa diunduh**: baris "Batch (semua episode)" dibuat
+  dengan URL **homepage** (`https://kusonime.com/`), bukan halaman detail. Akibatnya
+  pengambilan tabel unduhan gagal dan orkestrator fallback mencoba *streaming* di
+  source lain. Sekarang URL baris batch = halaman detail (tempat tabel `#dl` berada),
+  baris batch hanya dibuat bila tabelnya memang ada, dan hasilnya 29 link unduhan
+  (terverifikasi live untuk "Ameku Takao BD").
+- **Hasil pencarian dari banyak source tidak jelas asalnya**: setiap baris hasil kini
+  diberi badge `[source]`, dan status menampilkan rincian per source
+  (`12 hasil · samehadaku 5 · otakudesu 4 · …`) beserta error per source.
+- **Layar Detail** kini menampilkan baris `Source: <nama>`.
+
+### Ditambahkan
+
+- Cakupan pencarian: tombol **`S`** di layar Cari untuk beralih antara
+  "semua source" dan "source aktif"; default diatur lewat
+  `[general] search_scope = "all" | "selected"`.
+- Test: badge source, label Source di detail, toggle cakupan, dan URL batch Kusonime.
+
 ## [0.4.3] - 2026-11-15
 
 ### Diperbaiki

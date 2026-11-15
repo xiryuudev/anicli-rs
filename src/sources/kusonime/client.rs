@@ -107,7 +107,8 @@ impl Kusonime {
             .http
             .get_text_no_redirect(NAME, &url, Some(&base))
             .await?;
-        let mut detail = super::parse::parse_detail(&body, &base, &self.source)?;
+        // `parse_detail` memakai URL halaman untuk relative link + URL batch.
+        let mut detail = super::parse::parse_detail(&body, &url, &self.source)?;
         detail.url = url;
         Ok(detail)
     }

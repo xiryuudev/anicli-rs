@@ -267,13 +267,20 @@ pub fn parse_detail(html_text: &str, base: &Url, source: &SourceId) -> SourceRes
 
     let blocks = parse_batches(&document, base);
     // Kusonime tidak punya daftar episode: satu halaman = satu batch.
-    let episodes = vec![crate::model::Episode {
-        number: None,
-        label: "Batch (semua episode)".to_string(),
-        title: None,
-        url: base.clone(),
-        released: None,
-    }];
+    // Halaman batch berisi tabel unduhan; satu baris "Batch" mewakili semuanya.
+    // URL harus halaman detail ini (bukan homepage) supaya `streams` menemukan tabel.
+    let has_batch = !parse_batches(&document, base).is_empty();
+    let episodes = if has_batch {
+        vec![crate::model::Episode {
+            number: None,
+            label: "Batch (semua episode)".to_string(),
+            title: None,
+            url: base.clone(),
+            released: None,
+        }]
+    } else {
+        Vec::new()
+    };
 
     Ok(AnimeDetail {
         source: source.clone(),
@@ -432,6 +439,8 @@ mod tests {
         // Satu episode sintetis "Batch" supaya alur TUI tetap bisa lanjut ke stream.
         assert_eq!(detail.episodes.len(), 1);
         assert!(detail.episodes[0].label.to_lowercase().contains("batch"));
+        // URL batch harus halaman detail (tempat tabel unduhan berada).
+        assert_eq!(detail.episodes[0].url.as_str(), base().as_str());
     }
 
     #[test]

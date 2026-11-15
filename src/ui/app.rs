@@ -17,7 +17,7 @@ use ratatui::Terminal;
 use tokio::sync::mpsc::{self, UnboundedSender};
 
 use crate::bookmarks::{BookmarkEntry, Bookmarks};
-use crate::config::Config;
+use crate::config::{Config, SearchScope};
 use crate::error::SourceError;
 use crate::fallback::{Attempt, PlaybackService};
 use crate::history::{History, HistoryEntry};
@@ -159,6 +159,7 @@ pub struct App {
     pub screen: Screen,
     pub previous_screen: Option<Screen>,
     pub source_name: String,
+    pub search_scope: SearchScope,
     pub status: String,
     pub loading: bool,
     pub error: Option<String>,
@@ -203,6 +204,7 @@ impl App {
         log_buffer: Option<LogBuffer>,
     ) -> Self {
         let service = PlaybackService::new(registry.clone(), &config);
+        let search_scope = config.general.search_scope;
         let data_dir = if config.storage.data_dir.trim().is_empty() {
             paths.data_dir.clone()
         } else {
@@ -219,6 +221,7 @@ impl App {
             screen: Screen::Search,
             previous_screen: None,
             source_name: source_name.clone(),
+            search_scope,
             status: format!("source: {source_name}"),
             loading: false,
             error: None,
@@ -540,8 +543,20 @@ impl App {
                 self.input_focused = true;
             }
             KeyCode::Enter => self.open_detail(tx),
+            KeyCode::Char('S') => self.toggle_search_scope(),
             _ => {}
         }
+    }
+
+    fn toggle_search_scope(&mut self) {
+        self.search_scope = match self.search_scope {
+            SearchScope::All => SearchScope::Selected,
+            SearchScope::Selected => SearchScope::All,
+        };
+        self.status = format!(
+            "cakupan pencarian: {} (tekan S untuk ganti)",
+            self.search_scope
+        );
     }
 
     fn start_search(&mut self, tx: &UnboundedSender<AppEvent>) {
@@ -562,9 +577,18 @@ impl App {
         self.status = format!("mencari {:?} di {}…", query, source.name());
 
         let service = self.service.clone();
-        let order = self.fallback_order();
+        let order = if self.search_scope == SearchScope::Selected {
+            vec![self.source_name.clone()]
+        } else {
+            self.fallback_order()
+        };
         let tx = tx.clone();
-        self.status = format!("mencari {:?} di {}…", query, self.source_name);
+        self.status = format!(
+            "mencari {:?} di {} ({})…",
+            query,
+            source.name(),
+            self.search_scope
+        );
         tokio::spawn(async move {
             let order_refs: Vec<&str> = order.iter().map(String::as_str).collect();
             let outcome = service.search_all(&query, &order_refs).await;
@@ -1230,10 +1254,23 @@ impl App {
                 self.result_index = 0;
                 self.input_focused = self.results.is_empty();
                 self.attempts = errors.clone();
+                let mut counts: Vec<(String, usize)> = Vec::new();
+                for item in &self.results {
+                    let name = item.source.as_str().to_string();
+                    match counts.iter_mut().find(|(existing, _)| *existing == name) {
+                        Some((_, total)) => *total += 1,
+                        None => counts.push((name, 1)),
+                    }
+                }
+                let breakdown = counts
+                    .iter()
+                    .map(|(name, total)| format!("{name} {total}"))
+                    .collect::<Vec<_>>()
+                    .join(" · ");
                 self.status = if errors.is_empty() {
-                    format!("{count} hasil ({sources} source)")
+                    format!("{count} hasil ({sources} source) · {breakdown}")
                 } else {
-                    format!("{count} hasil ({sources} source) · {errors}")
+                    format!("{count} hasil ({sources} source) · {breakdown} · {errors}")
                 };
                 self.screen = Screen::Search;
             }
