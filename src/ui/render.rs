@@ -194,7 +194,11 @@ fn render_detail(frame: &mut Frame, app: &App, area: Rect) {
         }),
         Span::raw("   "),
         Span::styled("Episode: ", theme::dim()),
-        Span::raw(detail.episodes.len().to_string()),
+        Span::raw(if detail.episodes.is_empty() {
+            "? (Enter untuk memuat)".to_string()
+        } else {
+            detail.episodes.len().to_string()
+        }),
     ]));
     lines.push(Line::from(vec![
         Span::styled("Genre: ", theme::dim()),

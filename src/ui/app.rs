@@ -268,11 +268,23 @@ impl App {
     }
 
     fn fallback_order(&self) -> Vec<String> {
-        self.config
+        let mut order: Vec<String> = self
+            .config
             .playback_order()
             .iter()
             .map(|name| (*name).to_string())
-            .collect()
+            .collect();
+        // Source yang sedang dipilih diutamakan: pada pencarian paralel, dedupe
+        // "first wins" jadi menghormati pilihan user, bukan urutan config.
+        if let Some(position) = order.iter().position(|name| name == &self.source_name) {
+            if position > 0 {
+                let name = order.remove(position);
+                order.insert(0, name);
+            }
+        } else if !self.source_name.is_empty() {
+            order.insert(0, self.source_name.clone());
+        }
+        order
     }
 
     fn preferred_resolution(&self) -> Resolution {
@@ -644,10 +656,22 @@ impl App {
         });
     }
 
+    /// Urutan source untuk pencarian/fallback (source aktif di depan).
+    pub fn search_order(&self) -> Vec<String> {
+        self.fallback_order()
+    }
+
+    /// Target playback sesi ini (dipakai juga oleh test integrasi).
+    pub fn current_target(&self) -> Option<PlaybackTarget> {
+        self.build_target()
+    }
+
     fn build_target(&self) -> Option<PlaybackTarget> {
         let detail = self.detail.as_ref()?;
         let episode = self.episodes.get(self.episode_index);
-        let origin = crate::model::SourceId::new(self.source_name.clone());
+        // Origin HARUS source asal detail, bukan source tab: kalau user memilih hasil
+        // dari source lain, fast-path fallback tidak boleh menembak source tab.
+        let origin = detail.source.clone();
         Some(PlaybackTarget {
             anime_title: detail.title.clone(),
             alt_titles: detail.alt_titles.clone(),

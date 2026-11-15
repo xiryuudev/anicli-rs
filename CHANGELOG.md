@@ -4,6 +4,23 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.4.5] - 2026-11-15
+
+### Diperbaiki
+
+- **Salah source saat membuka episode/streaming**: `PlaybackTarget.origin` memakai
+  source tab, bukan source asal detail. Akibatnya memilih hasil dari Oploverz saat tab
+  di Samehadaku membuat fast-path fallback menembak Samehadaku dengan URL Oploverz,
+  lalu episode kosong/error. Sekarang origin = `detail.source`, jadi 0.4.4+ memuat
+  daftar episode Oploverz dengan benar (terverifikasi: Shin Evangelion Movie → 4
+  episode, stream 1 Direct).
+- **Urutan hasil pencarian tidak deterministik**: hasil digabung berdasarkan source
+  yang selesai lebih dulu, sehingga dedupe "first wins" tidak menghormati prioritas.
+  Sekarang hasil dikumpulkan per indeks lalu digabung sesuai urutan prioritas, dan
+  source yang sedang aktif selalu di depan.
+- **Detail menampilkan "Episode: 0"** padahal daftar belum dimuat: sekarang
+  "? (Enter untuk memuat)".
+
 ## [0.4.4] - 2026-11-15
 
 ### Diperbaiki

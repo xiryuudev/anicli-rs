@@ -357,8 +357,10 @@ impl PlaybackService {
         let mut errors: Vec<(String, SourceError)> = Vec::new();
         let mut sources_with_results = 0_usize;
 
-        let mut set: tokio::task::JoinSet<(String, Result<Vec<AnimeSearchResult>, SourceError>)> =
-            tokio::task::JoinSet::new();
+        // Hasil dikumpulkan per indeks source supaya urutan akhir mengikuti
+        // `order` (prioritas user), bukan siapa yang selesai lebih dulu.
+        type SearchSlot = (String, Result<Vec<AnimeSearchResult>, SourceError>);
+        let mut set: tokio::task::JoinSet<(usize, SearchSlot)> = tokio::task::JoinSet::new();
         for (index, source) in sources.into_iter().enumerate() {
             let query = query.to_string();
             let timeout = self.attempt_timeout;
@@ -374,14 +376,22 @@ impl PlaybackService {
                         step: "search",
                     }),
                 };
-                (site.to_string(), outcome)
+                (index, (site.to_string(), outcome))
             });
         }
 
+        let mut per_source: Vec<Option<SearchSlot>> = (0..sources_tried).map(|_| None).collect();
         while let Some(joined) = set.join_next().await {
-            let Ok((site, outcome)) = joined else {
+            let Ok((index, slot)) = joined else {
                 continue;
             };
+            if let Some(slot_ref) = per_source.get_mut(index) {
+                *slot_ref = Some(slot);
+            }
+        }
+
+        for slot in per_source.into_iter().flatten() {
+            let (site, outcome) = slot;
             match outcome {
                 Ok(found) => {
                     if found.is_empty() {
@@ -554,12 +564,13 @@ pub fn match_episode<'a>(episodes: &'a [Episode], target: &PlaybackTarget) -> Op
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::{SourceError, SourceResult};
     use crate::model::{
-        AiringStatus, AnimeDetail, MediaKind, RequestHeaders, Resolution, ServerKind, SourceId,
-        StreamKind,
+        AiringStatus, AnimeDetail, Episode, MediaKind, RequestHeaders, Resolution, ServerKind,
+        SourceId, StreamKind, StreamLink,
     };
     use crate::sources::mock::{MockData, MockSource};
-    use crate::sources::Capabilities;
+    use crate::sources::{AnimeSource, Capabilities};
     use url::Url;
 
     fn url(raw: &str) -> Url {
@@ -845,6 +856,70 @@ mod tests {
         assert_eq!(outcome.results.len(), 1);
         assert_eq!(outcome.errors.len(), 1);
         assert_eq!(outcome.errors[0].0, "otakudesu");
+    }
+
+    /// Source uji dengan delay buatan (untuk membuktikan urutan prioritas).
+    struct SlowSource {
+        name: &'static str,
+        delay_ms: u64,
+        results: Vec<AnimeSearchResult>,
+    }
+
+    #[async_trait::async_trait]
+    impl AnimeSource for SlowSource {
+        fn name(&self) -> &'static str {
+            self.name
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::all()
+        }
+        async fn search(&self, _query: &str) -> SourceResult<Vec<AnimeSearchResult>> {
+            tokio::time::sleep(Duration::from_millis(self.delay_ms)).await;
+            Ok(self.results.clone())
+        }
+        async fn ongoing(&self) -> SourceResult<Vec<AnimeSearchResult>> {
+            Ok(Vec::new())
+        }
+        async fn completed(&self) -> SourceResult<Vec<AnimeSearchResult>> {
+            Ok(Vec::new())
+        }
+        async fn detail(&self, _url: &str) -> SourceResult<AnimeDetail> {
+            Err(SourceError::unsupported(self.name, "detail"))
+        }
+        async fn episodes(&self, _anime_url: &str) -> SourceResult<Vec<Episode>> {
+            Err(SourceError::unsupported(self.name, "episodes"))
+        }
+        async fn streams(&self, _episode_url: &str) -> SourceResult<Vec<StreamLink>> {
+            Err(SourceError::unsupported(self.name, "streams"))
+        }
+    }
+
+    #[tokio::test]
+    async fn search_order_follows_priority_not_completion() {
+        // Source prioritas lebih lambat; hasil akhir tetap harus dari source itu.
+        let slow = Arc::new(SlowSource {
+            name: "samehadaku",
+            delay_ms: 80,
+            results: vec![search_result("One Piece", "https://slow.test/op")],
+        });
+        let fast = Arc::new(SlowSource {
+            name: "otakudesu",
+            delay_ms: 0,
+            results: vec![search_result("One Piece", "https://fast.test/op")],
+        });
+        let service = service(vec![slow, fast]);
+        let outcome = service
+            .search_all("one piece", &["samehadaku", "otakudesu"])
+            .await;
+        assert_eq!(outcome.results.len(), 1);
+        assert_eq!(
+            outcome.results[0].url.as_str(),
+            "https://slow.test/op",
+            "dedupe harus memilih source prioritas, bukan yang tercepat"
+        );
+        // (`search_result` helper memakai SourceId dummy; yang penting URL dari
+        // source prioritas.)
+        assert_eq!(outcome.sources_with_results, 2);
     }
 
     fn search_result(title: &str, url_raw: &str) -> AnimeSearchResult {

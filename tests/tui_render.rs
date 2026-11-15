@@ -303,6 +303,30 @@ async fn detail_screen_shows_origin_source() {
     assert!(text.contains("samehadaku"));
 }
 
+#[test]
+fn active_source_is_first_in_search_order() {
+    let mut app = app();
+    app.source_name = "otakudesu".to_string();
+    let order = app.search_order();
+    assert_eq!(order.first().map(String::as_str), Some("otakudesu"));
+    // semua source tetap ada, tanpa duplikat
+    let mut sorted = order.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(sorted.len(), order.len());
+}
+
+#[tokio::test]
+async fn playback_target_uses_detail_source_not_active_tab() {
+    let mut app = app();
+    app.source_name = "samehadaku".to_string();
+    let mut detail = sample_detail();
+    detail.source = SourceId::new("oploverz");
+    app.detail = Some(detail);
+    let target = app.current_target().expect("target");
+    assert_eq!(target.origin.as_str(), "oploverz");
+}
+
 #[tokio::test]
 async fn search_scope_can_be_toggled() {
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
