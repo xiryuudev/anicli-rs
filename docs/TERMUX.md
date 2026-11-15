@@ -57,6 +57,8 @@ readelf -l target/release/anicli | grep interpreter # /system/bin/linker64
 anicli --version
 ```
 
+Script juga membuat alias `anicli-rs` di `$PREFIX/bin/`, jadi kedua nama bisa dipakai.
+
 ## 3. Konfigurasi
 
 `anicli` membuat config otomatis saat pertama jalan:

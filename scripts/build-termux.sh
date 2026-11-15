@@ -81,8 +81,10 @@ if [ "$INSTALL" -eq 1 ]; then
   DEST="$PREFIX/bin/anicli"
   install -Dm755 "$BIN" "$DEST"
   install -Dm755 "$ROOT/target/release/sourcecheck" "$PREFIX/bin/sourcecheck"
-  echo "==> terpasang: $DEST"
-  echo "   jalankan: anicli"
+  # Alias agar nama "anicli-rs" (nama project) juga bisa dipakai.
+  ln -sf "$DEST" "$PREFIX/bin/anicli-rs"
+  echo "==> terpasang: $DEST (+ alias $PREFIX/bin/anicli-rs)"
+  echo "   jalankan: anicli   atau   anicli-rs"
 else
   echo "==> dilewati instalasi; binary: $BIN"
 fi
