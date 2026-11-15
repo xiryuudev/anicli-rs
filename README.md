@@ -77,18 +77,20 @@ Every release is built and packaged by GitHub Actions on **Ubuntu** and **Window
 (MSVC)** — no locally-built binaries are published.
 
 ```bash
-# Linux x86_64
-curl -L -o anicli.tar.gz \
-  https://github.com/xiryuudev/anicli-rs/releases/latest/download/anicli-rs-v0.3.0-x86_64-linux.tar.gz
-tar -xzf anicli.tar.gz
-./anicli
+# Linux x86_64 — single binary (also available as .tar.gz in the release)
+curl -L -o anicli \
+  https://github.com/xiryuudev/anicli-rs/releases/latest/download/anicli-x86_64-linux
+chmod +x anicli && ./anicli
 
-# Windows x86_64 (PowerShell): download the .zip from the same release page
+# Windows x86_64 — download from the release page:
 # https://github.com/xiryuudev/anicli-rs/releases/latest
+#   anicli-x86_64-windows.exe  (or the .zip with both binaries)
 ```
 
-Per-file binaries (`anicli-x86_64-linux`, `anicli-x86_64-windows.exe`, plus
-`sourcecheck`) and `SHA256SUMS-*.txt` are attached to each release as well.
+Each release ships: `anicli-rs-v<version>-x86_64-linux.tar.gz`,
+`anicli-rs-v<version>-x86_64-windows.zip`, per-file binaries
+(`anicli-x86_64-linux`, `anicli-x86_64-windows.exe`, `sourcecheck-*`) and
+`SHA256SUMS-*.txt` — all built and attached by CI.
 
 **Bleeding edge (not yet tagged):** open the latest green
 [CI run](https://github.com/xiryuudev/anicli-rs/actions/workflows/ci.yml), scroll to
