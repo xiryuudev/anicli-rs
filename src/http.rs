@@ -78,8 +78,23 @@ pub struct HttpClient {
     last_hit: Arc<std::sync::Mutex<HashMap<String, Instant>>>,
 }
 
+/// Pasang provider TLS ring sebagai default proses (idempotent).
+///
+/// `reqwest` dibangun dengan `rustls-no-provider` agar tidak memaksa `aws-lc-rs`
+/// (butuh cmake/NASM, menyulitkan build Termux/Android). Provider dipasang sebelum
+/// client pertama dibuat.
+pub fn ensure_tls_provider() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        // Hanya gagal bila sudah ada provider lain terpasang — tidak fatal.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
+
 impl HttpClient {
     pub fn new(config: &HttpConfig) -> SourceResult<Self> {
+        ensure_tls_provider();
         Ok(Self {
             client: build_client(config, true)?,
             client_no_redirect: build_client(config, false)?,

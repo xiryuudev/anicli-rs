@@ -54,7 +54,7 @@ Neonime, Hunter No Sekai) are intentionally **not** included.
 - Rust **1.88+** (edition 2021)
 - `mpv` (recommended) or `vlc`
 - `yt-dlp` for `Embed` links (optional but recommended)
-- Linux or Windows (x86_64)
+- Linux or Windows (x86_64), or Android via Termux (aarch64)
 
 ## Build
 
@@ -131,6 +131,26 @@ Data (history, bookmarks) and logs live next to it in the data directory
 | `Esc` | Back / clear |
 | `q` | Quit (also `Ctrl+C`) |
 | `?` | Help |
+
+## Android / Termux
+
+`anicli` runs inside **Termux** (F-Droid build) on aarch64 and hands video to
+**mpv-android** or **VLC Android** — Termux's own `mpv` package has no GUI, so the app
+launches the Android player through an intent.
+
+```bash
+pkg install -y rust clang perl make git termux-tools
+git clone https://github.com/xiryuudev/anicli-rs && cd anicli-rs
+bash scripts/build-termux.sh      # builds for aarch64-linux-android + installs to $PREFIX/bin
+anicli                            # press p on a stream -> opens mpv-android
+```
+
+- No NDK, no `--target`, no cmake/NASM: Termux's `rust` already targets Bionic, and
+  TLS uses the **ring** provider (not `aws-lc-rs`).
+- Launch order: `am start` intent (+ `-p is.xyz.mpv` / `-p org.videolan.vlc` when
+  preferred) → `termux-am` → `termux-open` → `termux-open-url`.
+- Set the player with `[playback] android_player = "mpv" | "vlc" | "auto"`.
+- Full walkthrough + troubleshooting: **[docs/TERMUX.md](docs/TERMUX.md)**.
 
 ## Configuration
 

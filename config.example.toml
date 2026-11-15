@@ -177,6 +177,9 @@ to_stderr = false
 #
 # Source yang belum diimplementasikan tidak akan dikenali (diabaikan + warning log).
 # =============================================================================
+# Player Android/Termux: "auto" (intent VIEW biasa), "mpv", atau "vlc".
+android_player = "auto"
+
 
 [sources.samehadaku]
 enabled = true

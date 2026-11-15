@@ -1123,6 +1123,51 @@ impl App {
             player::plan_playback(&self.config, &link, &media_title, None, player_path, ytdlp);
 
         match plan {
+            PlaybackPlan::Android { url, mime, prefer } => {
+                let job = self.next_job();
+                self.error = None;
+                self.player_status = format!("membuka player Android ({prefer})");
+                self.status = format!(
+                    "{} · buka player Android ({prefer}) {}",
+                    media_title,
+                    link.resolution_label()
+                );
+                self.record_history(&link);
+                let tx = tx.clone();
+                tokio::spawn(async move {
+                    let result = tokio::task::spawn_blocking(move || {
+                        crate::player::android::launch(&url, &mime, prefer)
+                    })
+                    .await;
+                    match result {
+                        Ok(Ok(program)) => {
+                            let _ = tx.send(AppEvent::PlayerStarted {
+                                job,
+                                program: program.clone(),
+                            });
+                            let _ = tx.send(AppEvent::PlayerExited {
+                                program,
+                                code: Some(0),
+                                stderr: String::new(),
+                            });
+                        }
+                        Ok(Err(message)) => {
+                            let _ = tx.send(AppEvent::Failed {
+                                job,
+                                error: crate::error::SourceError::app(message),
+                            });
+                        }
+                        Err(err) => {
+                            let _ = tx.send(AppEvent::Failed {
+                                job,
+                                error: crate::error::SourceError::app(format!(
+                                    "peluncur Android panik: {err}"
+                                )),
+                            });
+                        }
+                    }
+                });
+            }
             PlaybackPlan::Spawn(command) => {
                 let job = self.next_job();
                 self.error = None;

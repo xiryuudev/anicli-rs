@@ -120,6 +120,9 @@ async fn download(
     spec: &DownloadSpec,
     tx: &UnboundedSender<AppEvent>,
 ) -> Result<PathBuf, String> {
+    // Provider TLS harus terpasang sebelum client pertama (fitur
+    // rustls-no-provider di reqwest).
+    crate::http::ensure_tls_provider();
     let client = reqwest::Client::builder()
         .build()
         .map_err(|err| format!("gagal membuat client: {err}"))?;

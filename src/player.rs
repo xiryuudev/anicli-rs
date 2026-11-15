@@ -9,9 +9,11 @@ use std::path::{Path, PathBuf};
 
 use tokio::process::{Child, Command};
 
-use crate::config::{Config, EmbedStrategy, Player as PlayerKind};
+use crate::config::{AndroidPlayer, Config, EmbedStrategy, Player as PlayerKind};
 use crate::error::{SourceError, SourceResult};
 use crate::model::{StreamKind, StreamLink};
+
+pub mod android;
 
 pub const MPV_BIN: &str = "mpv";
 pub const VLC_BIN: &str = "vlc";
@@ -161,7 +163,16 @@ pub fn build_command(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlaybackPlan {
     Spawn(PlayerCommand),
-    Browser { url: String, reason: String },
+    /// Di Android/Termux: serahkan media ke aplikasi player lewat intent.
+    Android {
+        url: String,
+        mime: String,
+        prefer: AndroidPlayer,
+    },
+    Browser {
+        url: String,
+        reason: String,
+    },
     Refuse(String),
 }
 
@@ -169,6 +180,7 @@ impl PlaybackPlan {
     pub fn describe(&self) -> String {
         match self {
             Self::Spawn(command) => format!("memutar via {}", command.program.display()),
+            Self::Android { prefer, .. } => format!("membuka player Android ({prefer:?})"),
             Self::Browser { reason, .. } => format!("membuka browser: {reason}"),
             Self::Refuse(reason) => reason.clone(),
         }
@@ -185,6 +197,29 @@ pub fn plan_playback(
     start: Option<u64>,
     player: Option<PathBuf>,
     ytdlp: Option<PathBuf>,
+) -> PlaybackPlan {
+    plan_playback_with(
+        config,
+        link,
+        title,
+        start,
+        player,
+        ytdlp,
+        android::is_termux(),
+    )
+}
+
+/// Sama seperti [`plan_playback`], tetapi status Android diberikan eksplisit
+/// supaya bisa dites tanpa mengubah environment proses.
+#[allow(clippy::too_many_arguments)]
+pub fn plan_playback_with(
+    config: &Config,
+    link: &StreamLink,
+    title: &str,
+    start: Option<u64>,
+    player: Option<PathBuf>,
+    ytdlp: Option<PathBuf>,
+    on_android: bool,
 ) -> PlaybackPlan {
     match link.stream_kind {
         StreamKind::DownloadOnly => {
@@ -213,6 +248,25 @@ pub fn plan_playback(
                 };
             }
         }
+    }
+
+    if on_android {
+        // Android/Termux: mpv/vlc di PATH adalah build terminal tanpa GUI, jadi
+        // serahkan ke aplikasi lewat intent. Embed tetap ke browser.
+        if link.stream_kind == StreamKind::Embed
+            && config.playback.embed_strategy == EmbedStrategy::Browser
+        {
+            return PlaybackPlan::Browser {
+                url: link.url.to_string(),
+                reason: "embed dibuka di browser".to_string(),
+            };
+        }
+        let mime = android::media_mime(link.url.as_str(), link.container);
+        return PlaybackPlan::Android {
+            url: link.url.to_string(),
+            mime: mime.to_string(),
+            prefer: config.playback.android_player,
+        };
     }
 
     let Some(program) = player else {
@@ -301,6 +355,24 @@ pub fn summarize_stderr(stderr: &str, max_chars: usize) -> String {
 
 /// Buka URL di browser default (untuk link embed yang tidak bisa diputar langsung).
 pub fn open_browser(url: &str) -> SourceResult<()> {
+    // Android/Termux tidak punya xdg-open: gunakan termux-open-url.
+    if android::is_termux() {
+        for program in ["termux-open-url", "termux-open"] {
+            let mut command = std::process::Command::new(program);
+            command.arg(url);
+            command
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null());
+            if command.spawn().is_ok() {
+                return Ok(());
+            }
+        }
+        return Err(SourceError::app(
+            "gagal membuka browser: termux-open-url tidak tersedia (pkg install termux-tools)",
+        ));
+    }
+
     let (program, args): (&str, Vec<&str>) = if cfg!(target_os = "windows") {
         ("cmd", vec!["/C", "start", "", url])
     } else if cfg!(target_os = "macos") {
@@ -450,6 +522,22 @@ mod tests {
                     .any(|arg| arg.contains("mega.nz") || arg.contains("cdn.test")));
             }
             other => panic!("harus spawn, dapat {other:?}"),
+        }
+    }
+
+    #[test]
+    fn android_uses_intent_plan_instead_of_spawning_mpv() {
+        let config = Config::default();
+        let mut link = link(StreamKind::Direct);
+        link.url = Url::parse("https://cdn.example/stream.m3u8").unwrap();
+        let plan = plan_playback_with(&config, &link, "Judul", None, None, None, true);
+        match plan {
+            PlaybackPlan::Android { url, mime, prefer } => {
+                assert!(url.ends_with("stream.m3u8"));
+                assert_eq!(mime, "application/vnd.apple.mpegurl");
+                assert_eq!(prefer, crate::config::AndroidPlayer::Auto);
+            }
+            other => panic!("harus Android plan, dapat {other:?}"),
         }
     }
 

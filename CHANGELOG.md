@@ -4,6 +4,27 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.4.0] - 2026-11-15
+
+### Ditambahkan
+
+- **Android/Termux**: peluncur player Android (`src/player/android.rs`). Di Termux,
+  `p` tidak men-spawn mpv terminal melainkan menyerahkan URL ke aplikasi lewat intent
+  `VIEW` dengan urutan fallback `am` (`-p is.xyz.mpv` / `-p org.videolan.vlc` bila
+  dipilih) → `termux-am-starter` → `termux-am` → `termux-open` → `termux-open-url`,
+  lengkap dengan log percobaan + exit code bila semuanya gagal.
+- Config `[playback] android_player = "auto" | "mpv" | "vlc"`.
+- `scripts/build-termux.sh` (build native aarch64 + verifikasi ELF/linker64 + install
+  ke `$PREFIX/bin/anicli`) dan `docs/TERMUX.md` (panduan fresh Termux).
+- `open_browser` memakai `termux-open-url` di Android.
+
+### Diubah
+
+- **TLS backend pindah ke `ring`** (`rustls-no-provider` + provider dipasang sekali):
+  dependency `aws-lc-rs` hilang, sehingga build Termux/Android tidak lagi butuh
+  cmake/NASM — cukup clang/perl. Binary juga lebih kecil; HTTPS tetap terverifikasi
+  live (50 hasil Animeindo).
+
 ## [0.3.1] - 2026-11-15
 
 ### Diperbaiki

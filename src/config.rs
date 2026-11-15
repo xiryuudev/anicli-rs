@@ -156,6 +156,29 @@ impl fmt::Display for EmbedStrategy {
     }
 }
 
+/// Aplikasi player Android yang dipakai saat berjalan di Termux.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AndroidPlayer {
+    /// Intent VIEW tanpa filter paket: aplikasi default Android yang memutar.
+    #[default]
+    Auto,
+    /// mpv-android (`is.xyz.mpv`).
+    Mpv,
+    /// VLC Android (`org.videolan.vlc`).
+    Vlc,
+}
+
+impl std::fmt::Display for AndroidPlayer {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Auto => write!(formatter, "auto"),
+            Self::Mpv => write!(formatter, "mpv-android"),
+            Self::Vlc => write!(formatter, "vlc-android"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PlaybackConfig {
@@ -169,6 +192,9 @@ pub struct PlaybackConfig {
     pub embed_strategy: EmbedStrategy,
     pub foreground: bool,
     pub extra_args: Vec<String>,
+    /// Hanya dipakai di Android/Termux (lihat `player::android`).
+    #[serde(default)]
+    pub android_player: AndroidPlayer,
 }
 
 impl Default for PlaybackConfig {
@@ -184,6 +210,7 @@ impl Default for PlaybackConfig {
             embed_strategy: EmbedStrategy::Ytdl,
             foreground: false,
             extra_args: Vec::new(),
+            android_player: AndroidPlayer::Auto,
         }
     }
 }
