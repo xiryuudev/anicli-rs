@@ -20,6 +20,7 @@
 
 pub mod bookmarks;
 pub mod config;
+pub mod download;
 pub mod embed;
 pub mod error;
 pub mod fallback;

@@ -7,7 +7,7 @@ use url::Url;
 use crate::config::{Config, SourceConfig};
 use crate::error::{SourceError, SourceResult};
 use crate::http::{HttpClient, MirrorSet};
-use crate::model::{AnimeDetail, AnimeSearchResult, SourceId};
+use crate::model::{AnimeDetail, AnimeSearchResult, SourceId, StreamLink};
 
 pub const NAME: &str = "kusonime";
 pub const DEFAULT_BASE: &str = "https://kusonime.com";
@@ -127,6 +127,23 @@ impl Kusonime {
         )?;
         let body = self.http.get_text(NAME, &url, Some(&base)).await?;
         super::parse::parse_rest(&body, &self.source)
+    }
+
+    /// Ambil semua link batch (DownloadOnly) dari halaman detail.
+    pub async fn batch_streams(&self, page_url: &str) -> SourceResult<Vec<StreamLink>> {
+        let url = Url::parse(page_url).map_err(|err| {
+            SourceError::parse(NAME, "detail", "url", format!("URL tidak valid: {err}"))
+        })?;
+        let base = self.base_url().await?;
+        let body = self.http.get_text(NAME, &url, Some(&base)).await?;
+        let links = super::parse::batch_stream_links(&body, &url, &self.source);
+        if links.is_empty() {
+            return Err(SourceError::not_found(
+                NAME,
+                "tidak ada link batch di halaman ini",
+            ));
+        }
+        Ok(links)
     }
 
     pub fn source_id(&self) -> &SourceId {

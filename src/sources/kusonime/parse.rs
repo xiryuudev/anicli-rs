@@ -9,7 +9,8 @@ use url::Url;
 
 use crate::error::{SourceError, SourceResult};
 use crate::model::{
-    AiringStatus, AnimeDetail, AnimeSearchResult, Container, MediaKind, Resolution, SourceId,
+    AiringStatus, AnimeDetail, AnimeSearchResult, Container, MediaKind, RequestHeaders, Resolution,
+    ServerKind, SourceId, StreamKind, StreamLink,
 };
 use crate::sources::util;
 use crate::sources::util::{abs_url, attr, select, select_first, select_in, text};
@@ -37,6 +38,48 @@ pub struct DownloadRow {
 pub struct BatchBlock {
     pub title: String,
     pub rows: Vec<DownloadRow>,
+}
+
+/// Semua link batch di halaman detail sebagai `DownloadOnly`.
+///
+/// Tabel unduhan Kusonime berisi beberapa blok batch × baris resolusi × host.
+pub fn batch_stream_links(html_text: &str, base: &Url, source: &SourceId) -> Vec<StreamLink> {
+    let document = Html::parse_document(html_text);
+    let blocks = parse_batches(&document, base);
+    let mut links = Vec::new();
+    for block in &blocks {
+        for row in &block.rows {
+            for host in &row.links {
+                let container = row.container.map(|container| format!("{container:?}"));
+                let resolution = row
+                    .resolution
+                    .map(|resolution| resolution.to_string())
+                    .unwrap_or_default();
+                let mut parts = vec![row.label.clone()];
+                if !resolution.is_empty() {
+                    parts.push(resolution);
+                }
+                if let Some(container) = &container {
+                    parts.push(container.clone());
+                }
+                parts.push(host.host.clone());
+                links.push(StreamLink {
+                    source: source.clone(),
+                    resolution: row.resolution,
+                    label: parts.join(" "),
+                    server: ServerKind::Other(host.host.clone()),
+                    container: row.container,
+                    url: host.url.clone(),
+                    headers: RequestHeaders {
+                        referer: Some(base.clone()),
+                        user_agent: None,
+                    },
+                    stream_kind: StreamKind::DownloadOnly,
+                });
+            }
+        }
+    }
+    links
 }
 
 /// Hasil REST `/wp-json/wp/v2/posts?search=…`.
@@ -223,7 +266,14 @@ pub fn parse_detail(html_text: &str, base: &Url, source: &SourceId) -> SourceRes
         .collect::<Vec<_>>();
 
     let blocks = parse_batches(&document, base);
-    let episodes = Vec::new(); // Kusonime tidak punya daftar episode.
+    // Kusonime tidak punya daftar episode: satu halaman = satu batch.
+    let episodes = vec![crate::model::Episode {
+        number: None,
+        label: "Batch (semua episode)".to_string(),
+        title: None,
+        url: base.clone(),
+        released: None,
+    }];
 
     Ok(AnimeDetail {
         source: source.clone(),
@@ -379,10 +429,9 @@ mod tests {
             .iter()
             .any(|title| title.contains("天久鷹央")));
         assert!(!detail.synopsis.is_empty());
-        assert!(
-            detail.episodes.is_empty(),
-            "Kusonime tidak punya daftar episode"
-        );
+        // Satu episode sintetis "Batch" supaya alur TUI tetap bisa lanjut ke stream.
+        assert_eq!(detail.episodes.len(), 1);
+        assert!(detail.episodes[0].label.to_lowercase().contains("batch"));
     }
 
     #[test]
@@ -426,5 +475,33 @@ mod tests {
     fn download_table_detection() {
         assert!(has_download_table(&fixture("kusonime/detail.html")));
         assert!(!has_download_table("<html></html>"));
+    }
+}
+
+#[cfg(test)]
+mod batch_tests {
+    use super::*;
+
+    fn fixture(path: &str) -> String {
+        let full = format!("{}/tests/fixtures/{path}", env!("CARGO_MANIFEST_DIR"));
+        std::fs::read_to_string(&full).unwrap_or_else(|err| panic!("baca {full}: {err}"))
+    }
+
+    #[test]
+    fn batch_links_are_download_only() {
+        let base = Url::parse("https://kusonime.com/ameku-md-batch-subtitle-indonesia/").unwrap();
+        let links = batch_stream_links(
+            &fixture("kusonime/detail.html"),
+            &base,
+            &SourceId::new(NAME),
+        );
+        assert!(!links.is_empty(), "harus ada link batch");
+        assert!(links
+            .iter()
+            .all(|link| link.stream_kind == StreamKind::DownloadOnly));
+        assert!(links.iter().any(|link| link.resolution.is_some()));
+        assert!(links
+            .iter()
+            .any(|link| link.label.to_lowercase().contains("360")));
     }
 }

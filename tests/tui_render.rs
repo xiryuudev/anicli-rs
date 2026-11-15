@@ -1,7 +1,8 @@
 //! Test render TUI dengan `TestBackend` (tanpa terminal nyata) + logika navigasi.
 
-use std::sync::Arc;
 #[cfg(unix)]
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anicli_rs::bookmarks::BookmarkEntry;
@@ -535,22 +536,7 @@ async fn playing_records_history_with_a_fake_player() {
 }
 
 #[tokio::test]
-async fn download_only_link_is_refused_without_spawning() {
-    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-    let mut app = app();
-    app.detail = Some(sample_detail());
-    app.episodes = sample_episodes();
-    app.episode_index = 0;
-    app.streams = vec![sample_streams()[2].clone()]; // DownloadOnly
-    app.screen = ui::Screen::Streams;
-
-    app.handle_input(key(KeyCode::Char('p')), &tx);
-    assert!(app.error.as_deref().unwrap_or_default().contains("unduhan"));
-    assert!(app.history.is_empty());
-}
-
-#[tokio::test]
-async fn download_only_row_is_refused_even_if_direct_links_exist() {
+async fn download_only_row_opens_browser_when_link_is_indirect() {
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let mut app = app();
     app.detail = Some(sample_detail());
@@ -561,12 +547,42 @@ async fn download_only_row_is_refused_even_if_direct_links_exist() {
     app.screen = ui::Screen::Streams;
 
     app.handle_input(key(KeyCode::Char('p')), &tx);
+    // Link AceFile adalah halaman perantara -> dibuka di browser (atau error
+    // "gagal membuka browser" kalau xdg-open tidak tersedia di CI).
+    let detail = format!("{} {}", app.status, app.error.clone().unwrap_or_default());
     assert!(
-        app.error.as_deref().unwrap_or_default().contains("unduhan"),
-        "error: {:?}",
-        app.error
+        detail.to_lowercase().contains("browser"),
+        "status/error: {detail}"
     );
     assert!(app.history.is_empty(), "tidak boleh mencatat riwayat");
+    assert!(app.download.is_none(), "indirect link tidak diunduh in-app");
+}
+
+#[tokio::test]
+async fn download_progress_updates_state_and_footer() {
+    let mut app = app();
+    app.download = Some(ui::DownloadState::default());
+    app.handle_event(ui::AppEvent::DownloadStarted {
+        job: 1,
+        path: PathBuf::from("/tmp/a.mkv"),
+        total: Some(1000),
+    });
+    app.handle_event(ui::AppEvent::DownloadProgress {
+        job: 1,
+        downloaded: 450,
+        total: Some(1000),
+    });
+    let state = app.download.as_ref().unwrap();
+    assert_eq!(state.percent(), 45);
+    assert_eq!(state.bar(10), "████░░░░░░");
+    assert!(app.status.contains("45%"));
+
+    app.handle_event(ui::AppEvent::DownloadDone {
+        job: 1,
+        path: PathBuf::from("/tmp/a.mkv"),
+    });
+    assert!(app.download.as_ref().unwrap().done);
+    assert!(app.status.contains("selesai"));
 }
 
 #[tokio::test]

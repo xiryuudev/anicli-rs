@@ -11,6 +11,7 @@ use crate::config::{Config, SourceConfig};
 use crate::error::{SourceError, SourceResult};
 use crate::model::{AnimeDetail, AnimeSearchResult, Episode, StreamLink};
 use crate::sources::{AnimeSource, Capabilities, SourceFactory};
+use url::Url;
 
 use client::Kusonime;
 pub use client::NAME;
@@ -30,8 +31,17 @@ impl AnimeSource for Kusonime {
     }
 
     fn capabilities(&self) -> Capabilities {
-        // Download-only: berguna untuk pencarian, metadata, dan katalog batch.
-        Capabilities::metadata_only()
+        // Katalog batch: detail memuat tabel unduhan; tidak ada streaming.
+        Capabilities {
+            search: true,
+            ongoing: false,
+            completed: false,
+            genres: true,
+            detail: true,
+            episodes: true,
+            streams: true,
+            batch_download: true,
+        }
     }
 
     async fn search(&self, query: &str) -> SourceResult<Vec<AnimeSearchResult>> {
@@ -51,11 +61,21 @@ impl AnimeSource for Kusonime {
         Kusonime::detail(self, url).await
     }
 
-    async fn episodes(&self, _anime_url: &str) -> SourceResult<Vec<Episode>> {
-        Err(SourceError::unsupported(NAME, "episodes"))
+    async fn episodes(&self, anime_url: &str) -> SourceResult<Vec<Episode>> {
+        // Satu halaman = satu seri; tampilkan satu baris "Batch".
+        let url = Url::parse(anime_url).map_err(|err| {
+            SourceError::parse(NAME, "episodes", "url", format!("URL tidak valid: {err}"))
+        })?;
+        Ok(vec![Episode {
+            number: None,
+            label: "Batch (semua episode)".to_string(),
+            title: None,
+            url,
+            released: None,
+        }])
     }
 
-    async fn streams(&self, _episode_url: &str) -> SourceResult<Vec<StreamLink>> {
-        Err(SourceError::unsupported(NAME, "streams"))
+    async fn streams(&self, episode_url: &str) -> SourceResult<Vec<StreamLink>> {
+        Kusonime::batch_streams(self, episode_url).await
     }
 }

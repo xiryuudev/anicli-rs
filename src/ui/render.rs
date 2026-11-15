@@ -583,6 +583,37 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             theme::dim(),
         ),
     ])];
+    if let Some(download) = &app.download {
+        let (text, style) = if let Some(message) = &download.failed {
+            (format!("! gagal mengunduh: {message}"), theme::error())
+        } else if download.done {
+            (
+                format!(
+                    "✓ selesai: {} ({})",
+                    crate::download::display_path(&download.path),
+                    crate::download::format_bytes(download.downloaded)
+                ),
+                theme::accent(),
+            )
+        } else {
+            let total = download
+                .total
+                .map(crate::download::format_bytes)
+                .unwrap_or_else(|| "?".to_string());
+            (
+                format!(
+                    "[{}] {}%  {} / {}  → {}",
+                    download.bar(24),
+                    download.percent(),
+                    crate::download::format_bytes(download.downloaded),
+                    total,
+                    crate::download::display_path(&download.path)
+                ),
+                theme::base(),
+            )
+        };
+        lines.push(Line::from(Span::styled(text, style)));
+    }
     if let Some(error) = &app.error {
         lines.push(Line::from(Span::styled(
             format!("! {error}"),

@@ -4,6 +4,29 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.3.0] - 2026-11-15
+
+### Ditambahkan
+
+- **Unduhan di dalam aplikasi**: baris `download` tidak lagi hanya ditolak. Link file
+  langsung (mis. Pixeldrain `api/file`, `dl.*`, atau berakhiran `.mkv/.mp4/.rar/…`)
+  diunduh oleh aplikasi dengan **progress bar** di footer (persen, byte terunduh/total,
+  path tujuan) dan disimpan ke `<data>/downloads/<source>/<judul> - <episode> - <label>`.
+  Link halaman perantara (GoFile/Mega/MediaFire/AceFile/Terabox) **dibuka di browser**
+  dengan pesan status yang jelas. URL halaman Pixeldrain dinormalisasi ke file langsung.
+- **Kusonime kini mengekspos katalog batch**: satu episode sintetis "Batch (semua
+  episode)" → 25–30 link unduhan (360p–1080p, MKV/MP4) dari beberapa host. Sebelumnya
+  source ini hanya metadata sehingga tidak ada link unduhan yang bisa dipilih.
+- `AppEvent::Download{Started,Progress,Done,Failed}` + `DownloadState` (persen, bar,
+  format byte) dan dukungan `reqwest` fitur `stream` untuk unduhan bertahap.
+- Test baru: unduhan end-to-end memakai server HTTP lokal (file tertulis benar +
+  event progres), kegagalan jaringan, normalisasi Pixeldrain, dan state/progress UI.
+
+### Diubah
+
+- README: Kusonime sekarang berlabel **Download** (bukan sekadar metadata), plus bagian
+  cara kerja unduhan dan troubleshooting.
+
 ## [0.2.0] - 2026-11-15
 
 ### Ditambahkan

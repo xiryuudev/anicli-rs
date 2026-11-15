@@ -97,6 +97,24 @@ pub enum AppEvent {
         code: Option<i32>,
         stderr: String,
     },
+    DownloadStarted {
+        job: u64,
+        path: PathBuf,
+        total: Option<u64>,
+    },
+    DownloadProgress {
+        job: u64,
+        downloaded: u64,
+        total: Option<u64>,
+    },
+    DownloadDone {
+        job: u64,
+        path: PathBuf,
+    },
+    DownloadFailed {
+        job: u64,
+        message: String,
+    },
     Failed {
         job: u64,
         error: SourceError,
@@ -104,6 +122,32 @@ pub enum AppEvent {
 }
 
 /// State aplikasi. Field publik di dalam crate supaya render bisa murni & dites.
+/// Progres unduhan aktif di layar Stream.
+#[derive(Debug, Clone, Default)]
+pub struct DownloadState {
+    pub path: PathBuf,
+    pub downloaded: u64,
+    pub total: Option<u64>,
+    pub done: bool,
+    pub failed: Option<String>,
+}
+
+impl DownloadState {
+    pub fn percent(&self) -> u8 {
+        match self.total {
+            Some(total) if total > 0 => {
+                ((self.downloaded.saturating_mul(100) / total).min(100)) as u8
+            }
+            _ => 0,
+        }
+    }
+
+    pub fn bar(&self, width: usize) -> String {
+        let filled = (usize::from(self.percent()) * width / 100).min(width);
+        format!("{}{}", "█".repeat(filled), "░".repeat(width - filled))
+    }
+}
+
 pub struct App {
     pub config: Config,
     pub registry: Arc<SourceRegistry>,
@@ -128,6 +172,7 @@ pub struct App {
     pub attempts: String,
     pub player_status: String,
     pub player_running: bool,
+    pub download: Option<DownloadState>,
     pub history: History,
     pub bookmarks: Bookmarks,
     pub log_buffer: Option<LogBuffer>,
@@ -187,6 +232,7 @@ impl App {
             attempts: String::new(),
             player_status: String::new(),
             player_running: false,
+            download: None,
             history,
             bookmarks,
             log_buffer,
@@ -967,6 +1013,70 @@ impl App {
         }
     }
 
+    /// Mulai unduhan: file langsung diunduh di app (progress bar), halaman
+    /// perantara dibuka di browser.
+    fn start_download(&mut self, link: &StreamLink, tx: &UnboundedSender<AppEvent>) {
+        if let Some(active) = &self.download {
+            if !active.done && active.failed.is_none() {
+                self.status = "unduhan masih berjalan — tunggu sampai selesai".to_string();
+                return;
+            }
+        }
+        let label = link.label.clone();
+        let direct_url = crate::download::direct_file_url(&link.url);
+        if direct_url.is_none() && !crate::download::is_direct_file(&link.url) {
+            match crate::player::open_browser(link.url.as_str()) {
+                Ok(()) => {
+                    self.status = format!("link unduhan dibuka di browser: {label}");
+                    self.error = None;
+                }
+                Err(err) => self.error = Some(err.to_string()),
+            }
+            return;
+        }
+
+        let title = self
+            .detail
+            .as_ref()
+            .map(|detail| detail.title.clone())
+            .unwrap_or_else(|| "anicli-rs".to_string());
+        let episode_label = self
+            .episodes
+            .get(self.episode_index)
+            .map(|episode| episode.label_for_ui())
+            .unwrap_or_default();
+        let ext = link
+            .container
+            .map(|container| format!("{container:?}").to_ascii_lowercase())
+            .unwrap_or_else(|| "bin".to_string());
+        let raw_name = format!("{title} - {episode_label} - {label}");
+        let file_name = crate::download::safe_file_name(&raw_name, &ext);
+        let dest = self
+            .data_dir
+            .join("downloads")
+            .join(&self.source_name)
+            .join(file_name);
+        let spec = crate::download::DownloadSpec {
+            url: direct_url.unwrap_or_else(|| link.url.clone()),
+            dest: dest.clone(),
+            referer: link.headers.referer.clone(),
+            user_agent: link
+                .headers
+                .user_agent
+                .clone()
+                .or_else(|| Some(self.config.http.user_agent.clone())),
+        };
+        self.download = Some(DownloadState {
+            path: dest.clone(),
+            ..DownloadState::default()
+        });
+        self.status = format!("mengunduh {}", crate::download::display_path(&dest));
+        self.error = None;
+        let job = self.job;
+        let tx = tx.clone();
+        tokio::spawn(crate::download::run(job, spec, tx));
+    }
+
     /// Pilih link terbaik lalu putar (mpv/vlc) atau buka browser untuk embed.
     fn play_selected(&mut self, tx: &UnboundedSender<AppEvent>) {
         if self.player_running {
@@ -980,10 +1090,7 @@ impl App {
             return;
         };
         if link.stream_kind == StreamKind::DownloadOnly {
-            self.error = Some(
-                "Baris ini hanya unduhan (bukan streaming). Pilih baris direct/embed, atau tekan r."
-                    .to_string(),
-            );
+            self.start_download(&link, tx);
             return;
         }
         let title = self
@@ -1168,6 +1275,51 @@ impl App {
                 self.browse_items = items;
                 self.browse_index = 0;
                 self.screen = Screen::Browse;
+            }
+            AppEvent::DownloadStarted { path, total, .. } => {
+                let state = self.download.get_or_insert_with(DownloadState::default);
+                state.path = path.clone();
+                state.total = total;
+                self.status = format!(
+                    "mengunduh {} ({})",
+                    crate::download::display_path(&path),
+                    total
+                        .map(crate::download::format_bytes)
+                        .unwrap_or_else(|| "ukuran tidak diketahui".to_string())
+                );
+            }
+            AppEvent::DownloadProgress {
+                downloaded, total, ..
+            } => {
+                if let Some(state) = self.download.as_mut() {
+                    state.downloaded = downloaded;
+                    state.total = total.or(state.total);
+                    self.status = format!(
+                        "mengunduh {}% ({})",
+                        state.percent(),
+                        total
+                            .map(crate::download::format_bytes)
+                            .unwrap_or_else(|| crate::download::format_bytes(downloaded))
+                    );
+                }
+            }
+            AppEvent::DownloadDone { path, .. } => {
+                if let Some(state) = self.download.as_mut() {
+                    state.done = true;
+                    state.path = path.clone();
+                }
+                self.status = format!(
+                    "✓ unduhan selesai: {}",
+                    crate::download::display_path(&path)
+                );
+                self.error = None;
+            }
+            AppEvent::DownloadFailed { message, .. } => {
+                if let Some(state) = self.download.as_mut() {
+                    state.failed = Some(message.clone());
+                }
+                self.status = "unduhan gagal".to_string();
+                self.error = Some(format!("unduhan gagal: {message}"));
             }
             AppEvent::PlayerStarted { job, program } => {
                 if job != self.job {

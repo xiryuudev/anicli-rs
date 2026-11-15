@@ -23,6 +23,11 @@ play — with automatic fallback between sources when one fails.
   `Embed` links played through `yt-dlp` or opened in the browser.
 - **Player integration**: `mpv` or `vlc`, headers (User-Agent/Referer), `--start`,
   embed strategy (`yt-dlp` / browser), foreground or detached.
+- **Downloads**: selecting a `download` row downloads the file inside the app with a
+  live progress bar (speed-agnostic byte counter, saved to
+  `<data>/downloads/<source>/`). Hosts that only expose an intermediate page
+  (GoFile, Mega, MediaFire, AceFile…) open in your browser instead; Pixeldrain pages
+  are normalised to direct file URLs.
 - **Persistence**: TOML config (commented template, validation, migrations, atomic
   writes), watch history, bookmarks, rotating log files.
 - **Diagnostics**: `sourcecheck` binary for live source verification, real HTML
@@ -39,7 +44,7 @@ play — with automatic fallback between sources when one fails.
 | Animeindo | Streaming | `a.server[data-video]` → xtwap → `googlevideo` MP4 |
 | Anoboy | Streaming | Blogger iframe → MP4; JS-only hosts are exposed as `Embed` |
 | KotakAnime | Streaming | HLS (480p/720p/1080p) via AJAX player + decoded embed page |
-| Kusonime | Metadata | Batch download links only — no per-episode streaming |
+| Kusonime | Download | Batch page per series: 25–30 host links (360p–1080p, MKV/MP4); no streaming |
 
 Sources that are download-only, duplicate catalogs, or defunct (AWSubs, Doronime,
 Neonime, Hunter No Sekai) are intentionally **not** included.
@@ -99,7 +104,7 @@ Data (history, bookmarks) and logs live next to it in the data directory
 | `Tab` | Move to results / next pane |
 | `Enter` | Open selection / fetch streams |
 | `j` / `k`, `↓` / `↑` | Move selection |
-| `p` | Play highlighted stream with mpv/vlc |
+| `p` | Play highlighted stream (mpv/vlc) — or start/browse a download |
 | `r` | Pick resolution (highlight follows) |
 | `s` | Change source |
 | `l` | Browse (ongoing/completed) |
@@ -207,6 +212,9 @@ docs: DESIGN.md, CHANGELOG.md, config.example.toml
   add a mirror) in the config; mirror probing is built in.
 - **Windows: config not saving**: fixed in 0.1.5; make sure you run a current build.
 - **Player exits immediately**: the error banner now shows the player's stderr tail.
+- **Downloads**: `download` rows either download in-app (progress bar in the footer,
+  file under `<data>/downloads/`) or open in the browser when the host needs a page
+  and a captcha/JS flow.
 
 ## Legal
 

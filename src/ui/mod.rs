@@ -12,5 +12,5 @@ pub mod app;
 pub mod render;
 pub mod theme;
 
-pub use app::{run, App, AppEvent, Screen};
+pub use app::{run, App, AppEvent, DownloadState, Screen};
 pub use render::render;
