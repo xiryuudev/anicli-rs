@@ -5,6 +5,7 @@ on:
     branches: ["main"]
     tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -47,59 +48,20 @@ jobs:
       - name: Test
         run: cargo test
 
-      - name: Release build
-        run: cargo build --release
-
-  # Binary Windows asli (MSVC) — artefak diunggah untuk diunduh manual/rilis.
-  build-windows:
-    name: build (windows-latest msvc)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install NASM (aws-lc-rs)
-        run: choco install nasm -y --no-progress
-
-      - name: Toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Release build
-        run: cargo build --release --locked
-
-      - name: Package
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item target/release/anicli.exe dist/anicli-x86_64-windows.exe
-          Copy-Item target/release/sourcecheck.exe dist/sourcecheck-x86_64-windows.exe
-          Compress-Archive -Path dist/anicli-x86_64-windows.exe, dist/sourcecheck-x86_64-windows.exe -DestinationPath anicli-rs-${{ github.ref_name }}-x86_64-windows.zip
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: anicli-rs-windows-x86_64
-          path: anicli-rs-*-x86_64-windows.zip
-          if-no-files-found: error
-
-  # Saat tag v* di-push: bangun Linux + Windows lalu lampirkan ke GitHub Release.
-  release-assets:
-    name: release assets (${{ matrix.target }})
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, build-windows]
-    permissions:
-      contents: write
+  # Binary rilis untuk kedua platform, dibangun dan dikemas oleh CI.
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-linux
+            archive: tar.gz
           - os: windows-latest
             target: x86_64-windows
-    runs-on: ${{ matrix.os }}
+            archive: zip
     steps:
       - uses: actions/checkout@v4
 
@@ -116,38 +78,98 @@ jobs:
 
       - name: Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: Release build
         run: cargo build --release --locked
 
+      - name: Smoke test binary (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ./target/release/anicli --version
+          ./target/release/sourcecheck --help > /dev/null
+          ./target/release/anicli config path
+
+      - name: Smoke test binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./target/release/anicli.exe --version
+          ./target/release/sourcecheck.exe --help | Out-Null
+          ./target/release/anicli.exe config path
+
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
+          set -euo pipefail
+          VERSION=$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           mkdir -p dist
-          cp target/release/anicli dist/anicli-${{ matrix.target }}
-          cp target/release/sourcecheck dist/sourcecheck-${{ matrix.target }}
-          tar -czf anicli-rs-${{ github.ref_name }}-${{ matrix.target }}.tar.gz -C target/release anicli sourcecheck
+          cp target/release/anicli "dist/anicli-${{ matrix.target }}"
+          cp target/release/sourcecheck "dist/sourcecheck-${{ matrix.target }}"
+          tar -czf "anicli-rs-v$VERSION-${{ matrix.target }}.tar.gz" -C target/release anicli sourcecheck
+          ( cd dist && sha256sum * > "SHA256SUMS-${{ matrix.target }}.txt" )
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages[0].version
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item target/release/anicli.exe dist/anicli-${{ matrix.target }}.exe
-          Copy-Item target/release/sourcecheck.exe dist/sourcecheck-${{ matrix.target }}.exe
-          Compress-Archive -Path dist/anicli-${{ matrix.target }}.exe, dist/sourcecheck-${{ matrix.target }}.exe -DestinationPath anicli-rs-${{ github.ref_name }}-${{ matrix.target }}.zip
+          Copy-Item target/release/anicli.exe "dist/anicli-${{ matrix.target }}.exe"
+          Copy-Item target/release/sourcecheck.exe "dist/sourcecheck-${{ matrix.target }}.exe"
+          Compress-Archive -Path "dist/anicli-${{ matrix.target }}.exe", "dist/sourcecheck-${{ matrix.target }}.exe" `
+            -DestinationPath "anicli-rs-v$version-${{ matrix.target }}.zip"
+          Get-FileHash dist/* -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $($_.Path | Split-Path -Leaf)" } |
+            Out-File "dist/SHA256SUMS-${{ matrix.target }}.txt" -Encoding utf8
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anicli-rs-${{ matrix.target }}
+          path: |
+            dist/*
+            anicli-rs-v*-${{ matrix.target }}.tar.gz
+            anicli-rs-v*-${{ matrix.target }}.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  # Saat tag v* di-push: lampirkan artefak CI (Linux + Windows) ke GitHub Release.
+  release:
+    name: attach release assets
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download CI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect files
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find artifacts -type f -print
+          find artifacts -type f \( \
+            -name 'anicli-rs-v*.tar.gz' -o \
+            -name 'anicli-rs-v*.zip' -o \
+            -name 'anicli-x86_64-*' -o \
+            -name 'sourcecheck-x86_64-*' -o \
+            -name 'SHA256SUMS-*.txt' \) -exec cp {} release/ \;
+          ls -lh release
 
       - name: Attach to release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            anicli-rs-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
-            anicli-rs-${{ github.ref_name }}-${{ matrix.target }}.zip
-            dist/anicli-${{ matrix.target }}
-            dist/anicli-${{ matrix.target }}.exe
-            dist/sourcecheck-${{ matrix.target }}
-            dist/sourcecheck-${{ matrix.target }}.exe
-          fail_on_unmatched_files: false
+          files: release/*
+          fail_on_unmatched_files: true
+          generate_release_notes: false
 
   msrv:
     name: msrv (1.88)
