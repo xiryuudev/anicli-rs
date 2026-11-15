@@ -42,18 +42,27 @@ enum RequestSpec<'a> {
         referer: Option<&'a Url>,
         form: &'a [(&'a str, String)],
     },
+    PostMultipart {
+        url: &'a Url,
+        referer: Option<&'a Url>,
+        fields: &'a [(&'a str, String)],
+    },
 }
 
 impl RequestSpec<'_> {
     fn url(&self) -> &Url {
         match self {
-            Self::Get { url, .. } | Self::PostForm { url, .. } => url,
+            Self::Get { url, .. }
+            | Self::PostForm { url, .. }
+            | Self::PostMultipart { url, .. } => url,
         }
     }
 
     fn referer(&self) -> Option<&Url> {
         match self {
-            Self::Get { referer, .. } | Self::PostForm { referer, .. } => *referer,
+            Self::Get { referer, .. }
+            | Self::PostForm { referer, .. }
+            | Self::PostMultipart { referer, .. } => *referer,
         }
     }
 }
@@ -149,6 +158,26 @@ impl HttpClient {
             .map_err(|err| map_reqwest(source, "body", url, err))
     }
 
+    /// POST `multipart/form-data` lalu kembalikan body teks (dipakai AJAX player KotakAnime).
+    pub async fn post_multipart_text(
+        &self,
+        source: &'static str,
+        url: &Url,
+        fields: &[(&str, String)],
+        referer: Option<&Url>,
+    ) -> SourceResult<String> {
+        let spec = RequestSpec::PostMultipart {
+            url,
+            referer,
+            fields,
+        };
+        let response = self.execute(source, &spec, true).await?;
+        response
+            .text()
+            .await
+            .map_err(|err| map_reqwest(source, "body", url, err))
+    }
+
     /// Inti permintaan: semaphore global → lock per host → throttle → retry.
     async fn execute(
         &self,
@@ -228,6 +257,14 @@ impl HttpClient {
         let mut request = match spec {
             RequestSpec::Get { url, .. } => client.get((*url).clone()),
             RequestSpec::PostForm { url, form, .. } => client.post((*url).clone()).form(form),
+            RequestSpec::PostMultipart { url, fields, .. } => {
+                let form = fields
+                    .iter()
+                    .fold(reqwest::multipart::Form::new(), |form, (name, value)| {
+                        form.text((*name).to_string(), value.clone())
+                    });
+                client.post((*url).clone()).multipart(form)
+            }
         }
         .header(reqwest::header::ACCEPT_LANGUAGE, "id-ID,id;q=0.9,en;q=0.8");
         if let Some(referer) = spec.referer() {

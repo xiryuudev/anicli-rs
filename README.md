@@ -1,276 +1,220 @@
 # anicli-rs
 
-> TUI streaming anime subtitle Indonesia — cari, pilih episode & resolusi, lalu putar
-> ke **mpv** (fallback **vlc**). Modular: tiap situs penyedia adalah adapter terpisah.
+[![CI](https://github.com/xiryuudev/anicli-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/xiryuudev/anicli-rs/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/xiryuudev/anicli-rs)](https://github.com/xiryuudev/anicli-rs/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Proyek ini adalah penulisan ulang [`anicli-indo`](https://github.com/xiryuudev/) (Python,
-deprecated) dengan Rust + ratatui. Dirancang untuk **penggunaan pribadi/edukasi**.
+A terminal UI (TUI) for watching Indonesian-subtitled anime with **mpv** (and **vlc**
+as a fallback). Search across several sources, pick an episode and resolution, and
+play — with automatic fallback between sources when one fails.
 
----
+> Personal/educational project. It does not host or redistribute video; it only
+> resolves links from public sites and hands them to your local player.
 
-## Fitur
+## Features
 
-| Fitur | Status |
-|-------|--------|
-| Pencarian paralel lintas source (dedupe judul) | ✅ |
-| Browse ongoing / completed (per source, `l`) | ✅ (Samehadaku & Otakudesu) |
-| Detail anime (sinopsis, genre, status, tahun, skor, episode) | ✅ |
-| Daftar episode + navigasi | ✅ |
-| Pemilihan resolusi (240p–1080p sesuai source) | ✅ `r` untuk ganti |
-| Preferensi resolusi di config (`nearest_higher`/`nearest_lower`/`exact_only`) | ✅ |
-| Ganti source (`s`) & fallback otomatis antar source | ✅ |
-| Putar ke mpv/vlc dengan `Referer` + `User-Agent` | ✅ |
-| Embed (iframe) via mpv `--ytdl` / browser | ✅ (`embed_strategy`) |
-| Config TOML persisten + auto-create + layar Setting (`g`, baca-saja) | ✅ |
-| Logging file harian + layar Logs (`L`) | ✅ |
-| Source terpasang | ✅ Samehadaku, Otakudesu, **Oploverz**, **Animeindo**, **Anoboy**, Kusonime |
-| Source tambahan dari roadmap | ⏳ lihat "Status source" di bawah |
-| Riwayat tonton (`H`) & bookmark (`B`, toggle `b` di detail) | ✅ |
-| Source tambahan (Anoboy, Oploverz, Neonime, dll.) | ⏳ (Tahap 11) |
-| Download offline | ⏳ (hook disiapkan; v1 tidak) |
-| Image preview poster | ⏳ (feature flag `image-preview`) |
+- **TUI** built with `ratatui`/`crossterm`: Search, Browse, Detail, Episodes, Streams,
+  History, Bookmarks, Logs, Settings, and Help screens.
+- **7 sources** with a shared trait (`AnimeSource`), so a new site is a small module.
+- **Cross-source fallback** based on *identity* (title + episode number), not URLs:
+  if a source fails, the app tries the next one from your fallback order.
+- **Parallel search** with title de-duplication and per-source attempt log.
+- **Resolution selection**: exact or nearest resolution, HLS/MP4 direct links, and
+  `Embed` links played through `yt-dlp` or opened in the browser.
+- **Player integration**: `mpv` or `vlc`, headers (User-Agent/Referer), `--start`,
+  embed strategy (`yt-dlp` / browser), foreground or detached.
+- **Persistence**: TOML config (commented template, validation, migrations, atomic
+  writes), watch history, bookmarks, rotating log files.
+- **Diagnostics**: `sourcecheck` binary for live source verification, real HTML
+  fixtures for offline tests, `--mock` mode for a network-free demo.
+- **CI** on Ubuntu and Windows (native MSVC) plus an MSRV (1.88) job.
 
----
+## Supported sources
 
-## Status source
+| Source | Kind | Notes |
+|--------|------|-------|
+| Samehadaku | Streaming | IceFile HLS/MP4 (1080p/720p/360p) and Blogspot fallback |
+| Otakudesu | Streaming | AJAX player → desustream → direct MP4 |
+| Oploverz | Streaming | JSON API (`backapi.oploverz.ac`); presigned MP4 / embeds |
+| Animeindo | Streaming | `a.server[data-video]` → xtwap → `googlevideo` MP4 |
+| Anoboy | Streaming | Blogger iframe → MP4; JS-only hosts are exposed as `Embed` |
+| KotakAnime | Streaming | HLS (480p/720p/1080p) via AJAX player + decoded embed page |
+| Kusonime | Metadata | Batch download links only — no per-episode streaming |
 
-| Source | Status | Catatan |
-|--------|--------|---------|
-| Samehadaku | ✅ playable | IceFile HLS/MP4 (1080/720/360) + Blogspot |
-| Otakudesu | ✅ playable | desustream → MP4 `cdn.odcloud.net` |
-| Oploverz | ✅ playable | API JSON (search/detail/episodes) + stream upbolt/filedon(presigned MP4)/blogger; live: 10 hasil, strea 1 direct |
-| Animeindo | ✅ playable | server `xtwap` → googlevideo MP4; search `/search.php?q=` |
-| Anoboy | ✅ playable (sebagian) | iframe Blogger → MP4; host gdplayer/turbovid butuh browser/mati |
-| Kusonime | ✅ metadata | download-only (batch), tanpa streaming per episode |
-| KotakAnime | 🔜 recon selesai (playable) | HLS via AJAX player + decode embed (XOR); belum diimplementasikan |
-| AWSubs | 🔜 recon selesai | batch/download-only (Blogger + puristream opsional) |
-| Doronime | 🔜 recon selesai | download-only (safelink/CSRF; robots melarang jalur media) |
-| Neonime | ⚠️ katalog sama | `/neonime/` = alias katalog `animase.xyz` (mirip Anoboy/Animeindo) |
-| Hunter No Sekai | ❌ tidak aktif | domain mati/landing; tidak diimplementasikan |
+Sources that are download-only, duplicate catalogs, or defunct (AWSubs, Doronime,
+Neonime, Hunter No Sekai) are intentionally **not** included.
 
-Detail recon per source (selector, endpoint, fixture) ada di folder `research/`.
+## Requirements
 
-## Prasyarat
+- Rust **1.88+** (edition 2021)
+- `mpv` (recommended) or `vlc`
+- `yt-dlp` for `Embed` links (optional but recommended)
+- Linux or Windows (x86_64)
 
-- **Rust 1.88+** (edition 2021). Cek: `rustc --version`.
-- **mpv** (disarankan) dan/atau **vlc** untuk memutar.
-- **yt-dlp** (opsional) untuk link embed yang butuh ekstraktor.
-- **cmake** + build tools C: dibutuhkan saat build karena `rustls` memakai `aws-lc-rs`
-  (kode C). Di Windows: MSVC Build Tools + CMake (+ NASM bila diminta).
-- Linux: tidak butuh OpenSSL dev (TLS pakai rustls).
-
-Install player:
+## Build
 
 ```bash
-# Arch / Manjaro / CachyOS
-sudo pacman -S mpv
-# Debian / Ubuntu
-sudo apt install mpv
-# Windows
-winget install mpv
-# yt-dlp (opsional)
-sudo pacman -S yt-dlp        # atau: pipx install yt-dlp
-```
-
----
-
-## Build & install
-
-### Linux
-
-```bash
-git clone https://github.com/xiryuudev/anicli-rs.git
+git clone https://github.com/xiryuudev/anicli-rs
 cd anicli-rs
 cargo build --release
-install -Dm755 target/release/anicli ~/.local/bin/anicli
-anicli --version
+./target/release/anicli
 ```
 
-Butuh `cmake`/compiler untuk `aws-lc-sys`: `sudo pacman -S cmake base-devel` (Arch)
-atau `sudo apt install build-essential cmake` (Debian/Ubuntu).
+Windows (MSVC) notes:
 
-### Windows (x86_64-pc-windows-msvc)
+- `reqwest`'s `rustls` backend builds `aws-lc-rs`, which needs **CMake** and **NASM**
+  on `PATH` (`choco install cmake nasm -y` works on CI runners).
+- Release artifacts are built by CI for `x86_64-pc-windows-msvc`.
 
-1. Install [rustup](https://rustup.rs) → toolchain default `stable-x86_64-pc-windows-msvc`.
-2. Install **Visual Studio Build Tools** (workload "Desktop development with C++") dan
-   **CMake** (`winget install Kitware.CMake`). Jika build meminta, install NASM
-   (`winget install NASM.NASM`).
-3. Install mpv (`winget install mpv`) dan pastikan `mpv.exe` ada di `PATH`.
-4. Build:
-
-```powershell
-git clone https://github.com/xiryuudev/anicli-rs.git
-cd anicli-rs
-cargo build --release
-copy target\release\anicli.exe "$env:LOCALAPPDATA\Programs\anicli\anicli.exe"
-anicli --version
-```
-
-Kalau `mpv.exe` tidak ada di `PATH`, set `playback.mpv_path` di config.
-
-### Build tanpa jaringan tes / offline
-
-Tidak perlu internet untuk `cargo build` setelah dependensi ter-cache. Untuk verifikasi
-parser, semua fixture disimpan di `tests/fixtures/` (offline).
-
----
-
-## Menjalankan
+## Install a release build
 
 ```bash
-anicli                      # buka TUI
-anicli --source otakudesu   # mulai dengan source lain (sesi ini saja)
-anicli --resolution 1080p   # override resolusi sesi ini
-anicli --player vlc         # override player
-anicli --no-tui             # cetak ringkasan config/log (untuk CI/pipe/SSH)
-anicli config init          # tulis config.toml dari template berkomentar
-anicli config path          # cetak lokasi config/data/log
-anicli config show          # cetak config efektif (TOML)
+# Linux x86_64
+curl -L -o anicli.tar.gz \
+  https://github.com/xiryuudev/anicli-rs/releases/latest/download/anicli-rs-v0.2.0-x86_64-linux.tar.gz
+tar -xzf anicli.tar.gz
+./anicli
 ```
 
-Di lingkungan tanpa TTY, `anicli` otomatis mencetak ringkasan dan tidak menyalakan TUI.
+## Usage
 
-### Keymap
+```bash
+anicli                 # TUI
+anicli --no-tui        # print a short config/registry summary and exit
+anicli --source otakudesu --query "one piece"   # one-shot resolve (no TUI)
+anicli config init     # create the config from the commented template
+anicli config path     # print config/data/log locations
+```
 
-| Tombol | Aksi |
-|--------|------|
-| `/` atau `Tab` | fokus input pencarian |
-| `Enter` | cari → buka detail → pilih episode → ambil stream; di layar Stream: **putar** |
-| `j` `k` / `↑` `↓` | navigasi daftar |
-| `p` | putar link terbaik (mpv/vlc/browser untuk embed) |
-| `r` | ganti resolusi (cycle yang tersedia) |
-| `s` | ganti source aktif |
-| `l` | browse ongoing/completed (Tab: ganti tab) |
-| `b` (di detail) | toggle bookmark |
-| `H` | riwayat tonton (Enter: putar ulang, `d`: hapus) |
-| `B` | bookmark (Enter: buka, `d`: hapus) |
-| `L` | log aplikasi (ring buffer, `j`/`k` scroll) |
-| `g` | pengaturan efektif (baca-saja) |
-| `Esc` | kembali / lepas fokus |
-| `q` | keluar |
-| `?` | bantuan |
+First run creates the config automatically:
+`~/.config/anicli-rs/config.toml` (Linux) or `%APPDATA%\anicli-rs\` (Windows).
+Data (history, bookmarks) and logs live next to it in the data directory
+(`~/.local/share/anicli-rs/` on Linux).
 
-Alur: `Search` → `Enter` (detail) → `Enter` (episode) → `Enter` (stream) → `p` (putar).
+## Keybindings
 
----
+| Key | Action |
+|-----|--------|
+| `/` | Focus search |
+| `Tab` | Move to results / next pane |
+| `Enter` | Open selection / fetch streams |
+| `j` / `k`, `↓` / `↑` | Move selection |
+| `p` | Play highlighted stream with mpv/vlc |
+| `r` | Pick resolution (highlight follows) |
+| `s` | Change source |
+| `l` | Browse (ongoing/completed) |
+| `H` | History |
+| `B` | Bookmarks |
+| `L` | Logs |
+| `g` | Settings |
+| `b` / `d` | Bookmark / download-only action |
+| `Esc` | Back / clear |
+| `q` | Quit (also `Ctrl+C`) |
+| `?` | Help |
 
-## Konfigurasi
-
-Lokasi default:
-
-| OS | Config | Data (riwayat, log) |
-|----|--------|---------------------|
-| Linux | `~/.config/anicli-rs/config.toml` | `~/.local/share/anicli-rs/` |
-| Windows | `%APPDATA%\anicli-rs\config.toml` | `%LOCALAPPDATA%\anicli-rs\` |
-| macOS | `~/Library/Application Support/anicli-rs/config.toml` | sama |
-
-File dibuat otomatis dari template saat pertama jalan (`anicli config init` juga bisa).
-Contoh lengkap berkomentar ada di [`config.example.toml`](config.example.toml).
-
-Presedensi: **flag CLI > environment (`ANICLI_*`) > file config > default**.
-
-Setting penting:
+## Configuration
 
 ```toml
+config_version = 1
+
 [general]
 default_source = "samehadaku"
-fallback_order = ["samehadaku", "otakudesu", "kusonime"]
+default_resolution = "720p"
+fallback_order = [
+  "samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kotakanime", "kusonime",
+]
 
 [playback]
-player = "mpv"                  # mpv | vlc
-default_resolution = "720p"
-resolution_policy = "nearest_higher"
-embed_strategy = "ytdl"         # ytdl | browser | skip
-foreground = false              # true = mpv pakai terminal, TUI suspend
+player = "mpv"                 # mpv | vlc
+embed_strategy = "yt-dlp"      # yt-dlp | browser
+foreground = false
+
+[ui]
+language = "id"
 
 [http]
-request_delay_ms = 500          # sopan santun ke situs
-jitter_ms = 300
-max_concurrent = 6
-timeout_secs = 20
-retries = 2
-user_agent = "Mozilla/5.0 ... Chrome/126 ..."
+user_agent = "Mozilla/5.0 ..."
+rate_limit_per_host_ms = 500
+retry_max = 3
 
-[sources.samehadaku]
+[sources.kotakanime]
 enabled = true
-base_url = "https://v2.samehadaku.how"
+base_url = "https://s13.nontonanimeid.boats"   # host rotates; update if it moves
 mirrors = []
 ```
 
-**Domain berpindah?** Edit `base_url`/`mirrors` untuk source tersebut — tidak perlu
-rebuild. Aplikasi memvalidasi domain dengan marker konten (bukan hanya status 200),
-lalu menyimpan cache 1 jam.
+See `config.example.toml` for every field, including logging, history limits, and
+mirror lists.
 
----
+## How it works
 
-## Menambah source baru
+1. **Search** fans out across enabled sources and de-duplicates by normalized title.
+2. **Detail/episodes** are parsed with `scraper` selectors in pure functions that are
+   unit-tested against saved HTML fixtures.
+3. On play, the **episode identity** (title + number) is resolved on the chosen
+   source; if it fails, the next source in `fallback_order` is tried.
+4. Streams are ranked (`Direct` before `Embed`, preferred resolution, `prefer_mkv`)
+   and handed to the player. `Embed` links use `yt-dlp` when available, otherwise the
+   browser.
+5. Player failures (non-zero exit) are surfaced with the stderr tail instead of a
+   silent "finished".
 
-1. Riset endpoint/selector; simpan fixture HTML di `tests/fixtures/<nama>/`.
-2. Buat `src/sources/<nama>/` dengan `mod.rs`, `client.rs`, `parse.rs`
-   (`parse.rs` = fungsi murni, tanpa I/O, tanpa `unwrap`).
-3. Implementasikan `AnimeSource` (lihat `src/sources/mod.rs`); isi `capabilities()` jujur.
-4. Tulis test parser dari fixture (minimal search, detail, episode, stream/unduhan).
-5. Daftarkan factory di `sources::factories()` dan blok `[sources.<nama>]` di
-   `config.example.toml`.
-6. Verifikasi live: `cargo run --bin sourcecheck -- --source <nama> --query "judul"`.
-7. Update `DESIGN.md` §22 (recon) dan README ini.
+## Adding a source
 
-Detail arsitektur, alur fallback, dan kontrak parser ada di [`DESIGN.md`](DESIGN.md).
+1. Create `src/sources/<name>/` with `mod.rs`, `client.rs`, `parse.rs`.
+2. `parse.rs`: pure functions with tests that load fixtures from `tests/fixtures/`.
+3. `client.rs`: base URL, `MirrorSet` marker, HTTP calls, stream resolution.
+4. Implement `AnimeSource` and expose `NAME`, `build`, `factory`.
+5. Register the factory in `src/sources/mod.rs`.
+6. Add a `[sources.<name>]` block to `config.example.toml` and `Config::default()`.
+7. Verify with `cargo run --bin sourcecheck -- --source <name> --query "<title>"`.
 
----
-
-## Arsitektur singkat
-
-```
-UI (ratatui, async event loop)  ──channel──▶  PlaybackService (fallback)  ──▶  sources/*
-        ▲                                              │
-        └──────────── AppEvent (hasil job) ────────────┘
-                                                       ├─ resolve.rs  (pilih resolusi)
-                                                       ├─ player.rs   (mpv/vlc/browser)
-                                                       └─ http.rs     (rate limit, retry, mirror)
-```
-
-- Parser source adalah **fungsi murni** `&str → model`, dites dengan fixture offline.
-- Fallback lintas source memakai **identitas** (judul + nomor episode), bukan URL.
-- Semua request lewat `HttpClient` dengan jeda per host, retry terbatas, dan deteksi
-  anti-bot; satu TUI loop tidak pernah menunggu HTTP.
-
----
-
-## Verifikasi & pengembangan
+## Testing
 
 ```bash
-cargo test          # unit + CLI + HTTP (server lokal) + registry + TUI render
-cargo clippy --all-targets -- -D warnings
 cargo fmt --check
-cargo run --bin sourcecheck -- --source samehadaku --query "naruto"
+cargo clippy --all-targets -- -D warnings
+cargo test                    # 200+ tests, offline fixtures, TUI TestBackend
+cargo run --bin sourcecheck -- --source animeindo --query "black clover"
 ```
 
-`sourcecheck` mencetak alur search → detail → episode → stream untuk satu source
-(berguna saat situs berubah; error parse menyebut field yang gagal).
+CI runs these on Ubuntu and Windows, plus a MSRV 1.88 job.
 
----
+## Project layout
 
-## Batasan & catatan hukum
+```
+src/
+  sources/        # one module per site (parse.rs pure + client.rs + mod.rs trait impl)
+  ui/             # app state, event loop, render, theme
+  http.rs         # rate limit, retry, mirrors, soft-404, multipart
+  fallback.rs     # identity-based cross-source resolution
+  resolve.rs      # stream ranking
+  player.rs       # mpv/vlc/yt-dlp spawning and diagnostics
+  config.rs       # TOML load/save, validation, migrations, atomic writes
+  history.rs      # watch history
+  bookmarks.rs    # bookmarks
+  logging.rs      # file logging + in-TUI ring buffer
+tests/            # CLI/HTTP/registry/TUI integration tests + HTML fixtures
+research/         # recon notes per source (selectors, endpoints, fixtures)
+docs: DESIGN.md, CHANGELOG.md, config.example.toml
+```
 
-- Proyek ini **untuk penggunaan pribadi/edukasi**. Semua konten milik masing-masing
-  penyedia; proyek ini tidak meng-host, menyimpan, atau mendistribusikan video.
-- Tidak ada bypass DRM/paywall/Cloudflare challenge. Kalau source memblokir, aplikasi
-  melaporkan dan mencoba source lain (atau memakai `cookie_header` milik user sendiri).
-- Scraping mengikuti `robots.txt` yang terverifikasi dan memakai jeda antar request.
-  Untuk situs yang ToS-nya melarang scraping, gunakan atas risiko sendiri.
-- **Samehadaku** memblokir User-Agent kosong/generik; jangan mengganti `http.user_agent`
-  dengan nilai aneh.
-- **Otakudesu**: mirror alternatif sebagian berisi embed JS; v1 memakai player default
-  (`#pembed` → desustream → MP4).
-- **Kusonime** adalah katalog **download-only** (tidak ada streaming per episode) —
-  aplikasi menandainya jujur dan tidak menawarkan tombol putar.
-- Daftar episode di halaman detail Samehadaku dibatasi 100 baris oleh situsnya.
-- Link media beberapa host terikat IP & kedaluwarsa; aplikasi me-resolve tepat sebelum
-  memutar, bukan menyimpan URL media.
+## Troubleshooting
 
----
+- **Embed link fails to play**: hosts that need a browser session cannot be resolved
+  by `yt-dlp`. Set `playback.embed_strategy = "browser"` or pick a `Direct` link.
+- **Source stopped working / domain moved**: update `[sources.<name>].base_url` (or
+  add a mirror) in the config; mirror probing is built in.
+- **Windows: config not saving**: fixed in 0.1.5; make sure you run a current build.
+- **Player exits immediately**: the error banner now shows the player's stderr tail.
 
-## Lisensi
+## Legal
 
-MIT — lihat [`LICENSE`](LICENSE).
+This project is for personal, educational use only. All content is owned by the
+respective sites and rights holders. The project does not host, store, or distribute
+video, and does not bypass DRM or paywalls. Respect the terms of service and the laws
+in your country; you are responsible for how you use it.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

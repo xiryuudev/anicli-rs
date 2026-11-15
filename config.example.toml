@@ -33,7 +33,7 @@ default_source = "samehadaku"
 # Urutan fallback saat source utama gagal (error jaringan, diblokir, parser rusak,
 # stream kosong). Source pertama dicoba, lalu berikutnya. Nama yang tidak dikenal
 # akan diabaikan dengan peringatan di log.
-fallback_order = ["samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kusonime"]
+fallback_order = ["samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kotakanime", "kusonime"]
 
 # Bahasa antarmuka. Saat ini hanya "id".
 language = "id"
@@ -208,6 +208,12 @@ mirrors = []
 enabled = true
 base_url = "https://anoboy.id"
 mirrors = ["https://anoboy.nl"]
+
+[sources.kotakanime]
+enabled = true
+# Host s<N> berotasi; portal stabil: https://kotakanimeid.link
+base_url = "https://s13.nontonanimeid.boats"
+mirrors = []
 
 [sources.kusonime]
 enabled = true

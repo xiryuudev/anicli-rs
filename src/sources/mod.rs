@@ -16,6 +16,7 @@ use crate::model::{AnimeDetail, AnimeSearchResult, Episode, StreamLink};
 
 pub mod animeindo;
 pub mod anoboy;
+pub mod kotakanime;
 pub mod kusonime;
 pub mod mock;
 pub mod oploverz;
@@ -145,6 +146,10 @@ pub fn factories() -> &'static [SourceFactory] {
         SourceFactory {
             name: oploverz::NAME,
             build: oploverz::build,
+        },
+        SourceFactory {
+            name: kotakanime::NAME,
+            build: kotakanime::build,
         },
     ];
     FACTORIES
@@ -344,7 +349,7 @@ mod tests {
         let config = Config::default();
         let build = SourceRegistry::build(&config, &[]);
         assert!(build.registry.is_empty());
-        assert_eq!(build.missing.len(), 6);
+        assert_eq!(build.missing.len(), 7);
         assert!(build
             .warnings
             .iter()
@@ -368,7 +373,7 @@ mod tests {
         let build = SourceRegistry::build(&config, FACTORIES);
         assert_eq!(build.registry.len(), 1);
         assert_eq!(build.registry.names(), vec!["samehadaku"]);
-        assert_eq!(build.missing.len(), 5);
+        assert_eq!(build.missing.len(), 6);
     }
 
     #[test]
@@ -377,7 +382,7 @@ mod tests {
         config.sources.get_mut("samehadaku").unwrap().enabled = false;
         let build = SourceRegistry::build(&config, &[]);
         assert!(!build.missing.contains(&"samehadaku".to_string()));
-        assert_eq!(build.missing.len(), 5);
+        assert_eq!(build.missing.len(), 6);
     }
 
     #[tokio::test]

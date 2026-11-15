@@ -142,7 +142,7 @@ fn build_uses_factories_and_reports_missing_sources() {
     let build = SourceRegistry::build(&config, FACTORIES);
 
     assert_eq!(build.registry.names(), vec!["samehadaku"]);
-    assert_eq!(build.missing.len(), 5);
+    assert_eq!(build.missing.len(), 6);
     assert!(build
         .warnings
         .iter()
@@ -150,7 +150,7 @@ fn build_uses_factories_and_reports_missing_sources() {
 }
 
 #[test]
-fn from_config_instantiates_the_three_builtin_sources() {
+fn from_config_instantiates_builtin_sources() {
     // Tahap 5: ketiga source prioritas sudah terpasang, tanpa menyentuh jaringan
     // (konstruktor hanya membuat client + MirrorSet).
     let config = Config::default();
@@ -162,6 +162,7 @@ fn from_config_instantiates_the_three_builtin_sources() {
         vec![
             "animeindo",
             "anoboy",
+            "kotakanime",
             "kusonime",
             "oploverz",
             "otakudesu",

@@ -77,6 +77,7 @@ impl Default for GeneralConfig {
                 "oploverz".to_string(),
                 "animeindo".to_string(),
                 "anoboy".to_string(),
+                "kotakanime".to_string(),
                 "kusonime".to_string(),
             ],
             language: "id".to_string(),
@@ -319,6 +320,14 @@ fn default_sources() -> BTreeMap<String, SourceConfig> {
         SourceConfig {
             enabled: true,
             base_url: "https://kusonime.com".to_string(),
+            mirrors: Vec::new(),
+        },
+    );
+    sources.insert(
+        "kotakanime".to_string(),
+        SourceConfig {
+            enabled: true,
+            base_url: "https://s13.nontonanimeid.boats".to_string(),
             mirrors: Vec::new(),
         },
     );
@@ -847,7 +856,7 @@ mod tests {
     fn template_parses() {
         let parsed: Config = toml::from_str(CONFIG_TEMPLATE).expect("template harus valid TOML");
         assert_eq!(parsed.config_version, CURRENT_CONFIG_VERSION);
-        assert_eq!(parsed.sources.len(), 6);
+        assert_eq!(parsed.sources.len(), 7);
         assert!(parsed.sources.keys().any(|name| name == "otakudesu"));
     }
 

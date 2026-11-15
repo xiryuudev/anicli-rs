@@ -4,6 +4,26 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.2.0] - 2026-11-15
+
+### Ditambahkan
+
+- **KotakAnime** (playable): katalog HTML + player AJAX multipart `player_ajax`
+  (nonce per halaman, `data-post`/`data-nume`/`data-type`), lalu decode halaman embed
+  (base64 + XOR dengan **rumus key yang berubah tiap render**, dideteksi otomatis)
+  menjadi **HLS direct** 480p/720p/1080p yang bisa langsung diputar mpv.
+  Verifikasi live: search/detail/7 episode → 3 stream, 1 Direct siap mpv.
+- HTTP client: dukungan `POST multipart/form-data` (dibutuhkan AJAX KotakAnime).
+
+### Diubah
+
+- Default config kini **7 source** (samehadaku, otakudesu, oploverz, animeindo, anoboy,
+  kotakanime, kusonime) + fallback order diperbarui; `config.example.toml` ikut.
+- **README ditulis ulang dalam bahasa Inggris** dan dirapikan: hanya source yang
+  benar-benar terpasang yang didokumentasikan. Source mati atau download-only
+  (AWSubs, Doronime, Neonime, Hunter No Sekai) dihapus dari daftar.
+- Roadmap source #11 dinyatakan selesai untuk source yang layak streaming.
+
 ## [0.1.5] - 2026-11-15
 
 ### Diperbaiki
