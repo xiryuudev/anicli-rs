@@ -4,6 +4,26 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.3.1] - 2026-11-15
+
+### Diperbaiki
+
+- **CI Windows hijau**: `tests/tui_render.rs` meng-`cfg(unix)`-kan import `PathBuf`
+  sehingga kompilasi Windows gagal; import dipisah dengan benar.
+- **Checksum artefak**: `SHA256SUMS` ikut ter-hash sendiri di Windows (file terkunci
+  `Out-File` + `Get-FileHash dist/*`); sekarang hanya binary yang di-hash.
+
+### Diubah
+
+- **Semua binary rilis kini dibangun oleh CI**, bukan dari mesin lokal:
+  job `build` matrix (Ubuntu + Windows MSVC) menjalankan release build, smoke test
+  binary (`--version`, `config path`), mengemas `tar.gz`/`zip` + `SHA256SUMS`, lalu
+  mengunggahnya sebagai artefak.
+- Saat tag `v*` di-push, job `release` mengunduh artefak CI tersebut dan
+  melampirkannya ke GitHub Release (`anicli-x86_64-linux`,
+  `anicli-x86_64-windows.exe`, `sourcecheck-*`, arsip, dan checksum).
+- Trigger baru `workflow_dispatch` untuk build manual.
+
 ## [0.3.0] - 2026-11-15
 
 ### Ditambahkan
