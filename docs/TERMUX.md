@@ -39,14 +39,18 @@ Binary `aarch64-android` dibangun otomatis oleh GitHub Actions (NDK, Bionic) dan
 dilampirkan ke setiap Release:
 
 ```bash
-pkg install -y curl tar
-VERSION=0.4.2
-curl -L -o /tmp/anicli.tar.gz \
-  "https://github.com/xiryuudev/anicli-rs/releases/download/v$VERSION/anicli-rs-v$VERSION-aarch64-android.tar.gz"
-mkdir -p /tmp/anicli && tar -xzf /tmp/anicli.tar.gz -C /tmp/anicli
-install -m755 /tmp/anicli/anicli "$PREFIX/bin/anicli"
-install -m755 /tmp/anicli/sourcecheck "$PREFIX/bin/sourcecheck"
+pkg install -y curl
+# aset tanpa versi: selalu menunjuk rilis terbaru
+curl -L -o "$PREFIX/bin/anicli" \
+  https://github.com/xiryuudev/anicli-rs/releases/latest/download/anicli-aarch64-android
+curl -L -o "$PREFIX/bin/sourcecheck" \
+  https://github.com/xiryuudev/anicli-rs/releases/latest/download/sourcecheck-aarch64-android
+chmod +x "$PREFIX/bin/anicli" "$PREFIX/bin/sourcecheck"
 anicli --version
+
+# verifikasi (opsional): AArch64 + linker64
+readelf -h "$PREFIX/bin/anicli" | grep Machine
+readelf -l "$PREFIX/bin/anicli" | grep interpreter
 ```
 
 ### Opsi B — build di perangkat

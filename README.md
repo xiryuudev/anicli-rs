@@ -139,13 +139,13 @@ Data (history, bookmarks) and logs live next to it in the data directory
 launches the Android player through an intent.
 
 ```bash
-# Option A (recommended): download the CI-built Android binary from the latest release
-pkg install -y curl tar
-curl -L -o /tmp/a.tar.gz \
-  https://github.com/xiryuudev/anicli-rs/releases/latest/download/anicli-rs-v0.4.2-aarch64-android.tar.gz
-mkdir -p /tmp/a && tar -xzf /tmp/a.tar.gz -C /tmp/a
-install -m755 /tmp/a/anicli "$PREFIX/bin/anicli"
-install -m755 /tmp/a/sourcecheck "$PREFIX/bin/sourcecheck"
+# Option A (recommended): download the CI-built Android binary (no build needed)
+pkg install -y curl
+curl -L -o "$PREFIX/bin/anicli" \
+  https://github.com/xiryuudev/anicli-rs/releases/latest/download/anicli-aarch64-android
+curl -L -o "$PREFIX/bin/sourcecheck" \
+  https://github.com/xiryuudev/anicli-rs/releases/latest/download/sourcecheck-aarch64-android
+chmod +x "$PREFIX/bin/anicli" "$PREFIX/bin/sourcecheck"
 
 # Option B: build on device (rust + clang + perl + make + git)
 git clone https://github.com/xiryuudev/anicli-rs && cd anicli-rs
