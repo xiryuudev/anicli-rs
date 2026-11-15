@@ -1,8 +1,8 @@
 //! Test render TUI dengan `TestBackend` (tanpa terminal nyata) + logika navigasi.
 
-#[cfg(unix)]
 use std::path::PathBuf;
 use std::sync::Arc;
+#[cfg(unix)]
 use std::time::Duration;
 
 use anicli_rs::bookmarks::BookmarkEntry;
