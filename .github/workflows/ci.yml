@@ -137,11 +137,72 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  # Binary Android/Termux (aarch64, Bionic) via Android NDK — pengguna Termux
+  # tinggal unduh, tidak perlu build manual. ring tidak butuh cmake/NASM.
+  build-android:
+    name: build (aarch64-android)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain (target Android)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: aarch64-android
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+          add-to-path: true
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Release build (arm64-v8a, API 24)
+        run: |
+          set -euo pipefail
+          cargo ndk -t arm64-v8a -p 24 build --release --locked
+
+      - name: Verify ELF (aarch64 + linker64)
+        run: |
+          set -euo pipefail
+          BIN=target/aarch64-linux-android/release/anicli
+          file "$BIN"
+          readelf -h "$BIN" | grep -q 'AArch64' && echo "machine: AArch64 OK"
+          readelf -l "$BIN" | grep -qi 'interpreter.*linker64' && echo "interpreter: linker64 OK"
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          VERSION=$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')
+          mkdir -p dist
+          cp target/aarch64-linux-android/release/anicli "dist/anicli-aarch64-android"
+          cp target/aarch64-linux-android/release/sourcecheck "dist/sourcecheck-aarch64-android"
+          tar -czf "anicli-rs-v$VERSION-aarch64-android.tar.gz" -C target/aarch64-linux-android/release anicli sourcecheck
+          ( cd dist && sha256sum anicli-* sourcecheck-* > SHA256SUMS-aarch64-android.txt )
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anicli-rs-aarch64-android
+          path: |
+            dist/*
+            anicli-rs-v*-aarch64-android.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
   # Saat tag v* di-push: lampirkan artefak CI (Linux + Windows) ke GitHub Release.
   release:
     name: attach release assets
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, build]
+    needs: [test, build, build-android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -159,6 +220,8 @@ jobs:
           find artifacts -type f \( \
             -name 'anicli-rs-v*.tar.gz' -o \
             -name 'anicli-rs-v*.zip' -o \
+            -name 'anicli-aarch64-android' -o \
+            -name 'sourcecheck-aarch64-android' -o \
             -name 'anicli-x86_64-*' -o \
             -name 'sourcecheck-x86_64-*' -o \
             -name 'SHA256SUMS-*.txt' \) -exec cp {} release/ \;

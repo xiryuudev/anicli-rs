@@ -31,9 +31,28 @@ Pasang aplikasi Android (dari **F-Droid**):
 
 > `pkg install vlc` memasang VLC **terminal**, bukan VLC Android. Jangan dipakai.
 
-## 2. Ambil sumber dan build
+## 2. Pasang binary
+
+### Opsi A — unduh binary CI (disarankan, tanpa build)
+
+Binary `aarch64-android` dibangun otomatis oleh GitHub Actions (NDK, Bionic) dan
+dilampirkan ke setiap Release:
 
 ```bash
+pkg install -y curl tar
+VERSION=0.4.2
+curl -L -o /tmp/anicli.tar.gz \
+  "https://github.com/xiryuudev/anicli-rs/releases/download/v$VERSION/anicli-rs-v$VERSION-aarch64-android.tar.gz"
+mkdir -p /tmp/anicli && tar -xzf /tmp/anicli.tar.gz -C /tmp/anicli
+install -m755 /tmp/anicli/anicli "$PREFIX/bin/anicli"
+install -m755 /tmp/anicli/sourcecheck "$PREFIX/bin/sourcecheck"
+anicli --version
+```
+
+### Opsi B — build di perangkat
+
+```bash
+pkg install -y rust clang perl make git termux-tools
 cd ~
 git clone https://github.com/xiryuudev/anicli-rs
 cd anicli-rs

@@ -139,11 +139,20 @@ Data (history, bookmarks) and logs live next to it in the data directory
 launches the Android player through an intent.
 
 ```bash
-pkg install -y rust clang perl make git termux-tools
+# Option A (recommended): download the CI-built Android binary from the latest release
+pkg install -y curl tar
+curl -L -o /tmp/a.tar.gz \
+  https://github.com/xiryuudev/anicli-rs/releases/latest/download/anicli-rs-v0.4.2-aarch64-android.tar.gz
+mkdir -p /tmp/a && tar -xzf /tmp/a.tar.gz -C /tmp/a
+install -m755 /tmp/a/anicli "$PREFIX/bin/anicli"
+install -m755 /tmp/a/sourcecheck "$PREFIX/bin/sourcecheck"
+
+# Option B: build on device (rust + clang + perl + make + git)
 git clone https://github.com/xiryuudev/anicli-rs && cd anicli-rs
-bash scripts/build-termux.sh      # builds for aarch64-linux-android + installs to $PREFIX/bin
-anicli                            # press p on a stream -> opens mpv-android
+bash scripts/build-termux.sh
 ```
+
+`anicli` → press `p` on a stream → opens mpv-android.
 
 - No NDK, no `--target`, no cmake/NASM: Termux's `rust` already targets Bionic, and
   TLS uses the **ring** provider (not `aws-lc-rs`).

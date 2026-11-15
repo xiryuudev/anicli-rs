@@ -4,6 +4,24 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.4.2] - 2026-11-15
+
+### Ditambahkan
+
+- **Binary Android/Termux dibangun CI**: job `build-android` (Android NDK r27c +
+  `cargo-ndk`, target `aarch64-linux-android`, arm64-v8a, API 24) menghasilkan
+  `anicli-aarch64-android` + `sourcecheck-aarch64-android` dan arsip
+  `anicli-rs-v<version>-aarch64-android.tar.gz`. Job memverifikasi ELF lewat
+  `readelf` (Machine AArch64, interpreter `/system/bin/linker64`) sebelum mengunggah.
+- Artefak Android ikut dilampirkan ke GitHub Release saat tag `v*`, jadi pengguna
+  Termux **tidak perlu build manual**:
+  `pkg install curl tar && tar -xzf anicli-rs-v0.4.2-aarch64-android.tar.gz && install -m755 anicli "$PREFIX/bin/"`.
+
+### Diubah
+
+- `docs/TERMUX.md`: opsi A (unduh binary rilis, direkomendasikan) vs opsi B (build
+  dengan script). README ikut menyebut binary Android.
+
 ## [0.4.1] - 2026-11-15
 
 ### Diperbaiki
