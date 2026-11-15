@@ -4,6 +4,15 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.1.5] - 2026-11-15
+
+### Diperbaiki
+
+- **Windows (final):** penulisan file konfigurasi/persistensi tidak lagi memakai
+  temp+rename (yang terus gagal `Access is denied` karena handle antivirus/Defender).
+  Di Windows file ditulis langsung ke tujuan (truncate + fsync); Linux/macOS tetap
+  atomik via rename. CI Windows kini bisa hijau.
+
 ## [0.1.4] - 2026-11-15
 
 ### Diperbaiki

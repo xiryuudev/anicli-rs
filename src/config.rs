@@ -762,39 +762,11 @@ pub fn validate(config: &Config) -> Result<Vec<String>, ConfigError> {
 // Penulisan atomik
 // =============================================================================
 
-#[cfg(windows)]
-/// Ganti file tujuan dengan aman di Windows.
-///
-/// `rename` bisa gagal sementara (`Access is denied`) karena file baru masih
-/// dipindai antivirus/Defender, dan tidak bisa menimpa file tujuan yang ada.
-/// Strategi: hapus tujuan, retry rename dengan backoff, fallback salin isi.
-fn finalize_write(tmp: &Path, path: &Path) -> std::io::Result<()> {
-    if path.exists() {
-        let _ = std::fs::remove_file(path);
-    }
-    let mut last_error = None;
-    for attempt in 0..8 {
-        match std::fs::rename(tmp, path) {
-            Ok(()) => return Ok(()),
-            Err(err) => {
-                last_error = Some(err);
-                let _ = std::fs::remove_file(path);
-                std::thread::sleep(std::time::Duration::from_millis(40 * (attempt + 1)));
-            }
-        }
-    }
-    std::fs::copy(tmp, path).map_err(|err| last_error.unwrap_or(err))?;
-    let _ = std::fs::remove_file(tmp);
-    Ok(())
-}
-
-#[cfg(not(windows))]
-fn finalize_write(tmp: &Path, path: &Path) -> std::io::Result<()> {
-    std::fs::rename(tmp, path)
-}
-
 pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), ConfigError> {
-    let Some(parent) = path.parent() else {
+    let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    else {
         return Err(ConfigError::Write {
             path: path.to_path_buf(),
             source: std::io::Error::new(std::io::ErrorKind::InvalidInput, "path tanpa induk"),
@@ -805,6 +777,15 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), ConfigErro
         source,
     })?;
 
+    replace_contents(path, contents).map_err(|source| ConfigError::Write {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+/// POSIX: tulis ke `.tmp` lalu rename (atomik).
+#[cfg(not(windows))]
+fn replace_contents(path: &Path, contents: &str) -> std::io::Result<()> {
     let tmp = path.with_extension("toml.tmp");
     let write = || -> std::io::Result<()> {
         std::fs::write(&tmp, contents)?;
@@ -815,19 +796,28 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), ConfigErro
         }
         let file = std::fs::File::open(&tmp)?;
         file.sync_all()?;
-        // Tutup handle SEBELUM rename: Windows menolak memindahkan file yang masih
-        // dibuka tanpa FILE_SHARE_DELETE (Access is denied).
         drop(file);
-        finalize_write(&tmp, path)
+        std::fs::rename(&tmp, path)
     };
-
-    write().map_err(|source| {
+    write().inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp);
-        ConfigError::Write {
-            path: path.to_path_buf(),
-            source,
-        }
     })
+}
+
+/// Windows: temp+rename dan copy terus gagal `Access is denied` karena handle
+/// antivirus/Defender pada file baru. Tulis langsung ke tujuan (truncate + fsync);
+/// trade-off atomicity diterima agar config/bookmark/riwayat selalu bisa disimpan.
+#[cfg(windows)]
+fn replace_contents(path: &Path, contents: &str) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)?;
+    file.write_all(contents.as_bytes())?;
+    file.sync_all()?;
+    Ok(())
 }
 
 // =============================================================================
