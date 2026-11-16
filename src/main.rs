@@ -4,6 +4,7 @@
 //! platform, load/validasi config dengan pembuatan otomatis, logging file harian,
 //! dan ringkasan konfigurasi efektif. TUI masuk di Tahap 6.
 
+#![warn(clippy::uninlined_format_args)]
 #![forbid(unsafe_code)]
 
 use std::io::IsTerminal;

@@ -17,6 +17,8 @@
 //! (lihat DESIGN §24).
 
 #![forbid(unsafe_code)]
+// Samakan dengan clippy CI: format argumen harus di-inline (`{x}`).
+#![warn(clippy::uninlined_format_args)]
 
 pub mod android_proxy;
 pub mod bookmarks;

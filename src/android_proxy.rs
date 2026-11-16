@@ -154,7 +154,7 @@ fn random_token() -> String {
         .map(|elapsed| elapsed.as_nanos())
         .unwrap_or(0);
     let pid = std::process::id() as u128;
-    format!("{:x}{:x}", nanos, pid)
+    format!("{nanos:x}{pid:x}")
 }
 
 struct Request {
