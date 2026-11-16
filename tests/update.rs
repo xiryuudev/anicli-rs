@@ -1,8 +1,11 @@
 //! Uji fitur update: perbandingan versi, cache, dan pemasangan binary.
 
-use std::path::PathBuf;
+use anicli_rs::update::{asset_url, is_newer, update_hint, CheckCache, Platform};
 
-use anicli_rs::update::{asset_url, is_newer, update_hint, CheckCache, InstallOutcome, Platform};
+#[cfg(unix)]
+use anicli_rs::update::InstallOutcome;
+#[cfg(unix)]
+use std::path::PathBuf;
 
 #[test]
 fn version_compare_covers_common_cases() {
