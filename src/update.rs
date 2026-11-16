@@ -257,7 +257,7 @@ pub fn install_binary(new_binary: &Path, target: &Path) -> SourceResult<InstallO
             SourceError::app(format!("gagal menyalin ke {}: {err}", pending.display()))
         })?;
         let _ = std::fs::remove_file(new_binary);
-        return Ok(InstallOutcome::PendingWindows { path: pending });
+        Ok(InstallOutcome::PendingWindows { path: pending })
     }
     #[cfg(not(windows))]
     {
