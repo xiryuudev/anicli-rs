@@ -214,6 +214,17 @@ pub fn pixeldrain_direct(url: &Url) -> Option<Url> {
     Url::parse(&format!("https://pixeldrain.com/api/file/{id}")).ok()
 }
 
+/// Referer yang diwajibkan Blogger untuk `googlevideo` (`source=blogger`).
+///
+/// Tanpa header ini Google membalas 403; di desktop mpv/vlc bisa saja lolos
+/// karena kebetulan, tetapi di Android intent tidak membawa header sama sekali.
+pub const BLOGSPOT_REFERER: &str = "https://www.blogger.com/";
+
+/// `Referer` Blogger sebagai `Url` (None kalau entah kenapa tidak valid).
+pub fn blogspot_referer() -> Option<Url> {
+    Url::parse(BLOGSPOT_REFERER).ok()
+}
+
 /// URL media presigned (mis. R2/S3 `?X-Amz-Expires=...`) di halaman embed Filedon.
 ///
 /// Halaman filedon menyimpan URL dalam HTML ter-escape (`&quot;`, `\/`), jadi

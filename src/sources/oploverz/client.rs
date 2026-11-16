@@ -27,6 +27,8 @@ pub struct Oploverz {
     source: SourceId,
     mirrors: MirrorSet,
     http: Arc<HttpClient>,
+    /// UA yang dipakai untuk link yang butuh header (Blogger/googlevideo).
+    user_agent: String,
 }
 
 impl Oploverz {
@@ -47,6 +49,7 @@ impl Oploverz {
             source: SourceId::new(NAME),
             mirrors,
             http,
+            user_agent: config.http.user_agent.clone(),
         })
     }
 
@@ -215,7 +218,12 @@ impl Oploverz {
                         link.server = ServerKind::Blogspot;
                         link.resolution =
                             crate::embed::googlevideo_resolution(&link.url).map(Resolution);
-                        link.headers = RequestHeaders::default();
+                        link.headers = RequestHeaders {
+                            // Blogger/googlevideo menolak 403 tanpa Referer DAN
+                            // User-Agent browser; keduanya wajib.
+                            referer: crate::embed::blogspot_referer(),
+                            user_agent: Some(self.user_agent.clone()),
+                        };
                     }
                 }
             }

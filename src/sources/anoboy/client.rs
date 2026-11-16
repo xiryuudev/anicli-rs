@@ -137,7 +137,8 @@ impl Anoboy {
             server: ServerKind::Blogspot,
             container: Some(crate::model::Container::Mp4),
             headers: RequestHeaders {
-                referer: None,
+                // Blogger mewajibkan Referer; tanpa ini googlevideo membalas 403.
+                referer: crate::embed::blogspot_referer(),
                 user_agent: Some(self.user_agent.clone()),
             },
             url: media,

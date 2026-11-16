@@ -168,6 +168,8 @@ pub enum PlaybackPlan {
         url: String,
         mime: String,
         prefer: AndroidPlayer,
+        /// Header yang harus disuntikkan proxy lokal (Referer/User-Agent).
+        headers: crate::model::RequestHeaders,
     },
     Browser {
         url: String,
@@ -266,6 +268,7 @@ pub fn plan_playback_with(
             url: link.url.to_string(),
             mime: mime.to_string(),
             prefer: config.playback.android_player,
+            headers: link.headers.clone(),
         };
     }
 
@@ -532,7 +535,9 @@ mod tests {
         link.url = Url::parse("https://cdn.example/stream.m3u8").unwrap();
         let plan = plan_playback_with(&config, &link, "Judul", None, None, None, true);
         match plan {
-            PlaybackPlan::Android { url, mime, prefer } => {
+            PlaybackPlan::Android {
+                url, mime, prefer, ..
+            } => {
                 assert!(url.ends_with("stream.m3u8"));
                 assert_eq!(mime, "application/vnd.apple.mpegurl");
                 assert_eq!(prefer, crate::config::AndroidPlayer::Auto);

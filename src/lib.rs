@@ -18,6 +18,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod android_proxy;
 pub mod bookmarks;
 pub mod config;
 pub mod download;

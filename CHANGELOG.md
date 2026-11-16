@@ -4,6 +4,39 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.7.0] - 2026-11-16
+
+### Diperbaiki
+
+- **Android/Termux: mpv-android menutup sendiri** saat memutar link dari
+  Otakudesu→desustream dan Oploverz→blogspot. Penyebabnya: intent `VIEW` tidak bisa
+  membawa header, sedangkan kedua jenis link membutuhkannya —
+  **Blogger/googlevideo** mewajibkan `Referer: https://www.blogger.com/` dan
+  **desustream** memakai `User-Agent` khusus. Ditambahkan **proxy HTTP lokal**
+  (`src/android_proxy.rs`) yang berjalan di `127.0.0.1`:
+  - menyuntikkan `Referer`/`User-Agent` ke permintaan upstream;
+  - meneruskan `Range` dan `Content-Length` (seeking tetap jalan);
+  - **menulis ulang playlist HLS** (segmen, `#EXT-X-KEY`, `#EXT-X-MAP`) agar tetap
+    lewat proxy.
+  mpv-android kini menerima URL `http://127.0.0.1:PORT/...` sehingga tidak lagi
+  menerima 403 yang membuatnya crash.
+  **Bukti uji**: link `googlevideo` nyata → tanpa header **403 Forbidden**,
+  lewat proxy **206 Partial Content** berisi MP4 (`ftyp`).
+- **Referer Blogger** sekarang benar-benar disetel untuk link `googlevideo` di
+  Samehadaku, Anoboy, dan Oploverz (sebelumnya `None`), sehingga berfungsi baik di
+  desktop maupun Android.
+- **Parser Oploverz gagal saat API mengirim `null`** (mis. `poster`, `description`,
+  `japaneseTitle`, `genres`, `streamUrl`). Inilah penyebab pencarian seperti
+  "Aho Girl" kadang tidak muncul. Field kini null-tolerant (`null_to_default`) dan
+  ada test khusus untuk payload ber-`null`.
+
+### Ditambahkan
+
+- Test end-to-end proxy dengan upstream lokal: memastikan `Referer`/`User-Agent`
+  benar-benar diteruskan, tidak menambah header jika tidak diminta, dan kebijakan
+  "kapan butuh proxy" (HLS, googlevideo, atau ada header).
+- Test parser Oploverz untuk respons berisi `null`.
+
 ## [0.6.0] - 2026-11-16
 
 ### Ditambahkan

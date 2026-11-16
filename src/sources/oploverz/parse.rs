@@ -9,6 +9,19 @@ use crate::sources::util;
 
 pub const NAME: &str = "oploverz";
 
+/// Deserializer yang menganggap `null` sebagai nilai default.
+///
+/// API Oploverz kadang mengirim `null` untuk field yang biasanya string
+/// (mis. `poster`, `description`, `japaneseTitle`) sehingga `#[serde(default)]`
+/// saja tidak cukup — itu hanya menangani field yang *hilang*, bukan `null`.
+fn null_to_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + serde::Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
+}
+
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Meta {
     #[serde(rename = "currentPage", default)]
@@ -21,21 +34,21 @@ pub struct Meta {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct Genre {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     name: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct SeriesItem {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub title: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub slug: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub description: String,
-    #[serde(rename = "releaseType", default)]
+    #[serde(rename = "releaseType", default, deserialize_with = "null_to_default")]
     pub release_type: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub status: String,
     #[serde(default)]
     pub poster: Option<String>,
@@ -43,17 +56,21 @@ pub struct SeriesItem {
     pub score: Option<f32>,
     #[serde(rename = "totalEpisodes", default)]
     pub total_episodes: Option<u32>,
-    #[serde(rename = "japaneseTitle", default)]
+    #[serde(
+        rename = "japaneseTitle",
+        default,
+        deserialize_with = "null_to_default"
+    )]
     pub japanese_title: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     genres: Vec<Genre>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct StreamEntry {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub source: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_to_default")]
     pub url: String,
 }
 
@@ -61,7 +78,7 @@ pub struct StreamEntry {
 pub struct EpisodeItem {
     #[serde(rename = "episodeNumber", default)]
     pub episode_number: Option<String>,
-    #[serde(rename = "streamUrl", default)]
+    #[serde(rename = "streamUrl", default, deserialize_with = "null_to_default")]
     pub stream_url: Vec<StreamEntry>,
     #[serde(rename = "releasedAt", default)]
     pub released_at: Option<String>,
@@ -312,5 +329,50 @@ mod detail_fixture_tests {
         assert_eq!(detail.status, crate::model::AiringStatus::Completed);
         assert_eq!(detail.total_episodes, Some(1));
         assert!(detail.poster.is_some());
+    }
+}
+
+#[cfg(test)]
+mod null_tolerance_tests {
+    use super::*;
+
+    #[test]
+    fn list_with_null_fields_still_parses() {
+        // Bentuk nyata dari API: beberapa field string bernilai null.
+        let json = r#"{
+            "meta": {"currentPage": 1, "lastPage": 1, "total": 1},
+            "data": [{
+                "title": "One Piece",
+                "slug": "one-piece",
+                "description": null,
+                "poster": null,
+                "releaseType": null,
+                "status": null,
+                "score": null,
+                "japaneseTitle": null,
+                "totalEpisodes": null,
+                "genres": null
+            }]
+        }"#;
+        let (items, meta) = parse_series(json, &SourceId::new(NAME)).expect("harus parse");
+        assert_eq!(meta.total, 1);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title, "One Piece");
+    }
+
+    #[test]
+    fn episodes_with_null_lists_still_parse() {
+        let json = r#"{
+            "meta": {"currentPage": 1, "lastPage": 1, "total": 1},
+            "data": [{
+                "episodeNumber": "3",
+                "streamUrl": null,
+                "releasedAt": null
+            }]
+        }"#;
+        let (episodes, _) =
+            parse_episodes(json, "one-piece", &SourceId::new(NAME)).expect("harus parse");
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(episodes[0].number, Some(3));
     }
 }

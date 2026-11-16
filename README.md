@@ -172,6 +172,11 @@ bash scripts/build-termux.sh
   TLS uses the **ring** provider (not `aws-lc-rs`).
 - Launch order: `am start` intent (+ `-p is.xyz.mpv` / `-p org.videolan.vlc` when
   preferred) → `termux-am` → `termux-open` → `termux-open-url`.
+- **Headered links go through a local proxy.** Android intents cannot carry HTTP
+  headers, which broke Blogger (`Referer: https://www.blogger.com/`) and desustream
+  (`User-Agent`). When a link needs headers or is HLS, anicli starts a proxy on
+  `127.0.0.1` that injects the headers, forwards `Range`/`Content-Length`, and
+  rewrites HLS playlists — then hands mpv-android the proxy URL.
 - Set the player with `[playback] android_player = "mpv" | "vlc" | "auto"`.
 - Full walkthrough + troubleshooting, plus what (not) to change in `mpv.conf` /
   `input.conf`: **[docs/TERMUX.md](docs/TERMUX.md)**.

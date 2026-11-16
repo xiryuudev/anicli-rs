@@ -112,7 +112,37 @@ fn find_in_path(program: &str) -> Option<PathBuf> {
 }
 
 /// Coba semua kandidat sampai ada yang berhasil. Mengembalikan program yang dipakai.
-pub fn launch(url: &str, mime: &str, prefer: AndroidPlayer) -> Result<String, String> {
+///
+/// Bila link butuh header (Referer/UA) atau berupa HLS, URL diarahkan ke proxy
+/// lokal dulu supaya mpv-android menerima header yang benar.
+///
+/// Async karena memulai proxy butuh runtime tokio; proses `am`/`termux-open`
+/// sendiri dijalankan di `spawn_blocking`.
+pub async fn launch(
+    url: &str,
+    mime: &str,
+    prefer: AndroidPlayer,
+    headers: &crate::model::RequestHeaders,
+) -> Result<String, String> {
+    let parsed = url::Url::parse(url).map_err(|err| format!("URL tidak valid: {err}"))?;
+    let target = if crate::android_proxy::needs_proxy(&parsed, headers) {
+        let handle = crate::android_proxy::start()?;
+        let proxy_headers = crate::android_proxy::ProxyHeaders::from(headers);
+        let proxied = crate::android_proxy::proxy_url(&handle, &parsed, &proxy_headers)?;
+        tracing::info!(target: "anicli_rs::android", upstream = %parsed, proxied = %proxied, "memakai proxy header lokal");
+        proxied
+    } else {
+        url.to_string()
+    };
+
+    let target_clone = target.clone();
+    let mime_owned = mime.to_string();
+    tokio::task::spawn_blocking(move || launch_blocking(&target_clone, &mime_owned, prefer))
+        .await
+        .map_err(|err| format!("peluncur Android gagal: {err}"))?
+}
+
+fn launch_blocking(url: &str, mime: &str, prefer: AndroidPlayer) -> Result<String, String> {
     let mut log = Vec::new();
     for attempt in attempts(url, mime, prefer) {
         let Some(program) = find_in_path(&attempt.program) else {
