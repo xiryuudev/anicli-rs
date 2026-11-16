@@ -4,6 +4,34 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.6.0] - 2026-11-16
+
+### Ditambahkan
+
+- **Fitur update mandiri** (`src/update.rs`):
+  - `anicli update` / `anicli -U` — baca rilis terbaru dari GitHub API, bandingkan
+    versi semver, unduh aset sesuai platform (`anicli-x86_64-linux`,
+    `anicli-x86_64-windows.exe`, `anicli-aarch64-android`) dan ganti binary yang
+    berjalan. `anicli update --check` hanya melaporkan versi.
+  - Termux: target otomatis `$PREFIX/bin/anicli`; Windows: karena `.exe` yang sedang
+    berjalan terkunci, berkas baru disiapkan sebagai `anicli.new.exe` dan perintah
+    `move /Y` dicetak.
+  - Bila folder binary tidak bisa ditulis, updater mencetak perintah manual alih-alih
+    gagal diam-diam.
+  - **Toast non-intrusif** di footer TUI saat ada versi baru (hilang sendiri ~45 detik),
+    dengan perintah yang harus dijalankan. Pengecekan berjalan di latar saat start,
+    di-cache di `<data>/update-check.json` (`[update] check_interval_hours`, default 12
+    jam) dan bisa dimatikan (`check_on_start = false`).
+- Bagian config baru `[update]`, dokumentasi `README` (termasuk tabel perilaku per
+  platform) dan baris bantuan `anicli -U`.
+- Test: perbandingan versi, cache kedaluwarsa, URL aset per platform, pemasangan
+  binary (executable bit, sisa `.new` dibersihkan), dan toast UI.
+
+### Diperbaiki
+
+- Respons GitHub API yang berisi `null` (mis. `body` kosong) tidak lagi membuat parser
+  gagal — field opsional di-`Option`-kan.
+
 ## [0.5.0] - 2026-11-16
 
 ### Ditambahkan

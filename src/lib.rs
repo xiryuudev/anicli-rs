@@ -33,6 +33,7 @@ pub mod player;
 pub mod resolve;
 pub mod sources;
 pub mod ui;
+pub mod update;
 
 /// Versi aplikasi (dari `Cargo.toml`).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

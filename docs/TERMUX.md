@@ -180,6 +180,24 @@ Untuk VLC Android: tidak ada file config yang perlu diubah; atur di menu aplikas
 | TUI berantakan | `stty rows 40 cols 100` atau perkecil font terminal Termux. |
 | Config tidak tersimpan | v0.1.5+ sudah memperbaiki penulisan file di Windows/Android; pastikan versi terbaru. |
 
+## 6. Update tanpa buka browser
+
+Binary Android dibangun CI dan dilampirkan tiap rilis, jadi update cukup satu perintah:
+
+```bash
+anicli update --check   # cek versi (tidak mengubah apa pun)
+anicli update           # unduh + pasang otomatis ke $PREFIX/bin/anicli
+```
+
+Updater memakai aset `anicli-aarch64-android` dari rilis terbaru, menaruh unduhan di
+`~/.local/share/anicli-rs/update/`, lalu mengganti `$PREFIX/bin/anicli`.
+Di TUI, saat start ada pengecekan latar; bila versi baru tersedia muncul toast satu
+baris di footer: `↑ versi 0.6.0 tersedia — jalankan \`anicli update\`` (hilang sendiri).
+Matikan dengan `[update] check_on_start = false` di config.
+
+Jika `$PREFIX/bin` tidak bisa ditulis (jarang terjadi di Termux), updater mencetak
+perintah `curl` manual yang bisa kamu jalankan sendiri.
+
 ## 6. Alternatif: proot-distro
 
 Hanya jika build native gagal:

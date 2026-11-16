@@ -37,6 +37,10 @@ play — with automatic fallback between sources when one fails.
   are normalised to direct file URLs.
 - **Persistence**: TOML config (commented template, validation, migrations, atomic
   writes), watch history, bookmarks, rotating log files.
+- **Self-update**: `anicli update` (or `-U`) checks GitHub Releases, verifies the
+  platform asset, downloads it and replaces the running binary — on Linux, Windows
+  and Termux. The TUI shows a non-intrusive one-line toast in the footer when a newer
+  version exists (cached, checked at most every `[update] check_interval_hours`).
 - **Diagnostics**: `sourcecheck` binary for live source verification, real HTML
   fixtures for offline tests, `--mock` mode for a network-free demo.
 - **CI** on Ubuntu and Windows (native MSVC) plus an MSRV (1.88) job.
@@ -111,6 +115,8 @@ anicli --no-tui        # print a short config/registry summary and exit
 anicli --source otakudesu --query "one piece"   # one-shot resolve (no TUI)
 anicli config init     # create the config from the commented template
 anicli config path     # print config/data/log locations
+anicli update --check  # is a newer release available?
+anicli update          # download & install the latest release (alias: anicli -U)
 ```
 
 First run creates the config automatically:
@@ -200,6 +206,10 @@ user_agent = "Mozilla/5.0 ..."
 rate_limit_per_host_ms = 500
 retry_max = 3
 
+[update]
+check_on_start = true      # non-blocking check; shows a footer toast if newer
+check_interval_hours = 12  # cache window for the check
+
 [sources.kotakanime]
 enabled = true
 base_url = "https://s13.nontonanimeid.boats"   # host rotates; update if it moves
@@ -208,6 +218,28 @@ mirrors = []
 
 See `config.example.toml` for every field, including logging, history limits, and
 mirror lists.
+
+## Updating
+
+```bash
+anicli update --check   # just report: current vs latest
+anicli update           # download + install (same as anicli -U)
+```
+
+The updater reads `https://api.github.com/repos/xiryuudev/anicli-rs/releases/latest`,
+picks the asset for your platform
+(`anicli-x86_64-linux`, `anicli-x86_64-windows.exe`, `anicli-aarch64-android`),
+downloads it to `<data>/update/`, and swaps the running binary.
+
+| Platform | Behaviour |
+|----------|-----------|
+| Linux | staged copy + `rename` over the binary; needs a writable install dir (use `~/.local/bin`, not `/usr/bin`, or run with sudo) |
+| Termux (Android) | same as Linux — installs into `$PREFIX/bin/anicli` |
+| Windows | the running `.exe` is locked, so the new file is written next to it (`anicli.new.exe`) and the exact `move /Y` command is printed |
+
+If the install directory is not writable the updater prints the manual command
+instead of failing silently. All of this is also available as `--check` only, and can
+be disabled with `[update] check_on_start = false`.
 
 ## How it works
 

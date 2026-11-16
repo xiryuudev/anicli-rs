@@ -42,11 +42,13 @@ pub struct Config {
     pub ui: UiConfig,
     pub logging: LoggingConfig,
     pub sources: BTreeMap<String, SourceConfig>,
+    pub update: UpdateConfig,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
+            update: UpdateConfig::default(),
             config_version: CURRENT_CONFIG_VERSION,
             general: GeneralConfig::default(),
             playback: PlaybackConfig::default(),
@@ -157,6 +159,25 @@ impl fmt::Display for EmbedStrategy {
             Self::Skip => "skip",
         };
         f.write_str(text)
+    }
+}
+
+/// Setelan fitur cek update.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct UpdateConfig {
+    /// Cek versi terbaru saat aplikasi mulai (non-blocking).
+    pub check_on_start: bool,
+    /// Cache hasil cek (jam) supaya tidak memanggil API setiap kali start.
+    pub check_interval_hours: u64,
+}
+
+impl Default for UpdateConfig {
+    fn default() -> Self {
+        Self {
+            check_on_start: true,
+            check_interval_hours: 12,
+        }
     }
 }
 

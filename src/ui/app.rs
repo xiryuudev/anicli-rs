@@ -107,6 +107,13 @@ pub enum AppEvent {
         code: Option<i32>,
         stderr: String,
     },
+    /// Ada versi baru dari GitHub Releases (dikirim sekali saat start).
+    UpdateAvailable {
+        version: String,
+        tag: String,
+        url: String,
+        hint: String,
+    },
     /// Di Android: intent berhasil dikirim; playback terjadi di aplikasi lain.
     PlayerLaunched {
         program: String,
@@ -173,6 +180,9 @@ pub struct App {
     pub search_slots: Vec<Option<Vec<AnimeSearchResult>>>,
     pub search_cancel: Option<tokio::task::AbortHandle>,
     pub selector: Option<SourceSelector>,
+    /// Toast update yang sedang tampil (versi lebih baru).
+    pub update_toast: Option<String>,
+    pub update_version: Option<String>,
     pub status: String,
     pub loading: bool,
     pub error: Option<String>,
@@ -238,6 +248,8 @@ impl App {
             search_slots: Vec::new(),
             search_cancel: None,
             selector: None,
+            update_toast: None,
+            update_version: None,
             status: format!("source: {source_name}"),
             loading: false,
             error: None,
@@ -306,6 +318,62 @@ impl App {
     fn preferred_resolution(&self) -> Resolution {
         self.resolution_override
             .unwrap_or(self.config.playback.default_resolution)
+    }
+
+    /// Cek update di background (non-blocking) dan tampilkan toast bila ada versi baru.
+    ///
+    /// Memakai cache di data dir supaya tidak memanggil GitHub API setiap start.
+    pub fn spawn_update_check(&self, tx: &UnboundedSender<AppEvent>) {
+        if !self.config.update.check_on_start {
+            return;
+        }
+        let interval = self.config.update.check_interval_hours;
+        let cached = crate::update::CheckCache::load(&self.data_dir);
+        let cached_latest = cached
+            .as_ref()
+            .filter(|cache| cache.is_fresh(interval))
+            .map(|cache| cache.latest.clone());
+
+        let tx = tx.clone();
+        let data_dir = self.data_dir.clone();
+        let http_config = self.config.http.clone();
+        let platform = crate::update::Platform::current();
+
+        tokio::spawn(async move {
+            let latest = match cached_latest {
+                Some(version) => version,
+                None => {
+                    let Ok(http) = crate::http::HttpClient::new(&http_config) else {
+                        return;
+                    };
+                    let Ok(release) = crate::update::latest_release(&http).await else {
+                        return;
+                    };
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|elapsed| elapsed.as_secs())
+                        .unwrap_or(0);
+                    crate::update::CheckCache {
+                        checked_at: now,
+                        latest: release.version.clone(),
+                    }
+                    .save(&data_dir);
+                    release.version
+                }
+            };
+
+            if !crate::update::is_newer(crate::VERSION, &latest) {
+                return;
+            }
+            let tag = format!("v{latest}");
+            let _ = tx.send(AppEvent::UpdateAvailable {
+                version: latest,
+                tag: tag.clone(),
+                url: "https://github.com/xiryuudev/anicli-rs/releases/latest".to_string(),
+                hint: "anicli update".to_string(),
+            });
+            let _ = platform;
+        });
     }
 
     /// Buka popup pemilih source (tombol `s`).
@@ -379,6 +447,10 @@ impl App {
 
     pub fn on_tick(&mut self) {
         self.tick = self.tick.wrapping_add(1);
+        // Toast update hilang sendiri setelah ~45 detik agar tidak mengganggu.
+        if self.update_toast.is_some() && self.tick.is_multiple_of(375) {
+            self.update_toast = None;
+        }
     }
 
     /// Tangani satu event keyboard; spawn job bila perlu.
@@ -1606,6 +1678,15 @@ impl App {
                 self.status = "unduhan gagal".to_string();
                 self.error = Some(format!("unduhan gagal: {message}"));
             }
+            AppEvent::UpdateAvailable {
+                version,
+                tag: _tag,
+                url: _url,
+                hint,
+            } => {
+                self.update_version = Some(version.clone());
+                self.update_toast = Some(format!("versi {version} tersedia — jalankan `{hint}`"));
+            }
             AppEvent::PlayerLaunched { program } => {
                 self.player_running = false;
                 self.error = None;
@@ -1685,6 +1766,8 @@ async fn event_loop(
     let mut events = EventStream::new();
     let (tx, mut rx) = mpsc::unbounded_channel::<AppEvent>();
     let mut ticker = tokio::time::interval(Duration::from_millis(120));
+    // Cek update sekali di latar; hasilnya muncul sebagai toast di footer.
+    app.spawn_update_check(&tx);
 
     loop {
         terminal

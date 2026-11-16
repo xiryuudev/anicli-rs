@@ -13,7 +13,10 @@ const SPINNER: [&str; 4] = ["|", "/", "-", "\\"];
 
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
-    let footer_height = if app.error.is_some() { 3 } else { 2 };
+    let mut footer_height = if app.error.is_some() { 3 } else { 2 };
+    if app.update_toast.is_some() {
+        footer_height += 1;
+    }
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -652,6 +655,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         Line::from("  q              keluar (saat tidak mengetik)"),
         Line::from("  Ctrl+C         keluar kapan saja"),
         Line::from("  ?              tutup bantuan"),
+        Line::from("  anicli -U      cek & pasang update (juga: anicli update)"),
         Line::from(""),
         Line::from(Span::styled(
             "  Sumber konten milik masing-masing penyedia — untuk penggunaan pribadi.",
@@ -708,6 +712,12 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             )
         };
         lines.push(Line::from(Span::styled(text, style)));
+    }
+    if let Some(toast) = &app.update_toast {
+        lines.push(Line::from(Span::styled(
+            format!("↑ {toast}"),
+            theme::warning(),
+        )));
     }
     if let Some(error) = &app.error {
         lines.push(Line::from(Span::styled(

@@ -23,6 +23,8 @@ use anicli_rs::ui;
 
 /// Exit code untuk kesalahan yang bisa diperbaiki user di config/CLI.
 const EXIT_CONFIG: u8 = 2;
+/// Exit code untuk kegagalan jaringan (mis. cek update).
+const EXIT_NETWORK: u8 = 3;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -72,6 +74,10 @@ struct Cli {
     #[arg(long, global = true, value_name = "DIR")]
     mock: Option<PathBuf>,
 
+    /// Cek update lalu pasang binary versi terbaru (sama dengan `anicli update`).
+    #[arg(short = 'U', long = "update", global = true)]
+    update_flag: bool,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -95,6 +101,15 @@ impl From<PlayerArg> for Player {
 enum Command {
     /// Kelola file konfigurasi.
     Config(ConfigArgs),
+    /// Cek & pasang versi terbaru dari GitHub Releases.
+    Update(UpdateArgs),
+}
+
+#[derive(Debug, Args)]
+struct UpdateArgs {
+    /// Hanya cek versi terbaru, jangan unduh/pasang.
+    #[arg(long)]
+    check: bool,
 }
 
 #[derive(Debug, Args)]
@@ -132,6 +147,15 @@ async fn main() -> ExitCode {
 async fn run(cli: Cli) -> Result<ExitCode> {
     let paths = Paths::resolve(cli.config.clone(), cli.data_dir.clone())
         .context("gagal menentukan lokasi config/data")?;
+
+    // Update tidak butuh config (dan harus jalan walau config rusak).
+    if cli.update_flag || matches!(cli.command, Some(Command::Update(_))) {
+        let check_only = matches!(
+            cli.command,
+            Some(Command::Update(UpdateArgs { check: true }))
+        );
+        return update_cli(&paths, check_only).await;
+    }
 
     // Subcommand yang tidak butuh memuat config.
     if let Some(Command::Config(args)) = &cli.command {
@@ -243,6 +267,114 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         &log,
         &registry_build.registry,
     );
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `anicli update` / `anicli -U`: cek rilis terbaru, lalu unduh & pasang.
+async fn update_cli(paths: &Paths, check_only: bool) -> Result<ExitCode> {
+    use anicli_rs::update::{self, InstallOutcome, Platform};
+
+    let http = anicli_rs::http::HttpClient::new(&anicli_rs::config::HttpConfig::default())
+        .context("gagal membuat HTTP client untuk cek update")?;
+    println!("anicli {} — memeriksa rilis terbaru…", anicli_rs::VERSION);
+
+    let release = match update::latest_release(&http).await {
+        Ok(release) => release,
+        Err(err) => {
+            eprintln!("anicli: gagal memeriksa update: {}", err.user_message());
+            return Ok(ExitCode::from(EXIT_NETWORK));
+        }
+    };
+
+    let platform = Platform::current();
+    if !update::is_newer(anicli_rs::VERSION, &release.version) {
+        println!(
+            "✓ sudah versi terbaru ({}){}",
+            anicli_rs::VERSION,
+            platform
+                .map(|platform| format!(" · {}", platform.describe()))
+                .unwrap_or_default()
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    println!(
+        "↑ versi baru tersedia: {} → {} ({})",
+        anicli_rs::VERSION,
+        release.version,
+        release.tag
+    );
+    if !release.notes.trim().is_empty() {
+        let first = release
+            .notes
+            .lines()
+            .find(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
+            .unwrap_or("")
+            .trim();
+        if !first.is_empty() {
+            println!("  {first}");
+        }
+    }
+    println!("  {}", release.html_url);
+
+    let Some(platform) = platform else {
+        println!(
+            "\nPlatform ini belum punya aset otomatis. Unduh manual dari {}",
+            release.html_url
+        );
+        return Ok(ExitCode::SUCCESS);
+    };
+    println!("  aset: {} ({})", platform.asset(), platform.describe());
+
+    if check_only {
+        println!(
+            "\nJalankan `anicli update` untuk memasang {}.",
+            release.version
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    let target = update::current_binary()?;
+    if !update::is_writable(&target) {
+        println!(
+            "\n! Folder binary tidak bisa ditulis ({}).\n  {}",
+            target.display(),
+            update::update_hint(&release.tag, Some(platform))
+        );
+        return Ok(ExitCode::from(EXIT_CONFIG));
+    }
+
+    let data_dir = paths.data_dir.clone();
+    let staged = data_dir.join("update").join(platform.asset());
+    println!("↓ mengunduh {}…", platform.asset());
+    let size = match update::download_asset(platform, &staged).await {
+        Ok(size) => size,
+        Err(err) => {
+            eprintln!("anicli: unduhan gagal: {}", err.user_message());
+            return Ok(ExitCode::from(EXIT_NETWORK));
+        }
+    };
+    println!("  {} byte terunduh", size);
+
+    match update::install_binary(&staged, &target)? {
+        InstallOutcome::Installed { path } => {
+            println!(
+                "✓ terpasang: {} (versi {})",
+                path.display(),
+                release.version
+            );
+            println!("  jalankan ulang anicli untuk memakai versi baru.");
+        }
+        InstallOutcome::PendingWindows { path } => {
+            println!("✓ berkas baru disiapkan: {}", path.display());
+            println!(
+                "  Windows mengunci binary yang sedang berjalan. Tutup anicli lalu jalankan:\n\
+                 \x20   move /Y \"{}\" \"{}\"",
+                path.display(),
+                target.display()
+            );
+        }
+    }
     Ok(ExitCode::SUCCESS)
 }
 

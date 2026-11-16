@@ -344,6 +344,32 @@ async fn search_scope_can_be_toggled() {
     assert_eq!(app.search_scope, anicli_rs::config::SearchScope::All);
 }
 
+#[tokio::test]
+async fn update_toast_shows_version_and_self_dismisses() {
+    let mut app = app();
+    app.handle_event(ui::AppEvent::UpdateAvailable {
+        version: "9.9.9".into(),
+        tag: "v9.9.9".into(),
+        url: "https://example.test/release".into(),
+        hint: "anicli update".into(),
+    });
+    assert_eq!(app.update_version.as_deref(), Some("9.9.9"));
+    let text = render_text(&app, 110, 26);
+    assert!(text.contains("versi 9.9.9 tersedia"), "{text}");
+    assert!(text.contains("anicli update"), "{text}");
+
+    // Toast hilang sendiri setelah ~45 detik (375 tick × 120 ms).
+    // `on_tick` menaikkan tick lebih dulu, jadi 374 -> 375 (belum kelipatan berikut).
+    app.tick = 373;
+    app.on_tick();
+    assert_eq!(app.tick, 374);
+    assert!(app.update_toast.is_some(), "belum waktunya hilang");
+    app.tick = 749;
+    app.on_tick();
+    assert_eq!(app.tick, 750);
+    assert!(app.update_toast.is_none(), "toast harus hilang sendiri");
+}
+
 #[test]
 fn error_banner_is_visible() {
     let mut app = app();

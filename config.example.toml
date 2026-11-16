@@ -239,3 +239,9 @@ mirrors = []
 # enabled  = false
 # base_url = "https://anoboy.li"
 # mirrors  = []
+
+[update]
+# Cek versi terbaru saat aplikasi mulai (toast kecil di bawah, tidak mengganggu).
+check_on_start = true
+# Jarak minimal antar pengecekan otomatis (jam).
+check_interval_hours = 12
