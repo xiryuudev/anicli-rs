@@ -368,7 +368,7 @@ impl App {
             let tag = format!("v{latest}");
             let _ = tx.send(AppEvent::UpdateAvailable {
                 version: latest,
-                tag: tag.clone(),
+                tag,
                 url: "https://github.com/xiryuudev/anicli-rs/releases/latest".to_string(),
                 hint: "anicli update".to_string(),
             });

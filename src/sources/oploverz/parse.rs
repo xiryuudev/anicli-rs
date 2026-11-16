@@ -192,7 +192,7 @@ pub fn parse_episodes(
                 .and_then(util::parse_episode_number);
             let number_label = number
                 .map(|number| number.to_string())
-                .or(item.episode_number.clone())
+                .or_else(|| item.episode_number.clone())
                 .unwrap_or_default();
             if number_label.is_empty() {
                 return None;

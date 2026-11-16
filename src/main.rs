@@ -354,7 +354,7 @@ async fn update_cli(paths: &Paths, check_only: bool) -> Result<ExitCode> {
             return Ok(ExitCode::from(EXIT_NETWORK));
         }
     };
-    println!("  {} byte terunduh", size);
+    println!("  {size} byte terunduh");
 
     match update::install_binary(&staged, &target)? {
         InstallOutcome::Installed { path } => {
