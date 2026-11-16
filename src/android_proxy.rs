@@ -250,8 +250,7 @@ async fn forward(
     request: &Request,
     token: &str,
 ) -> Result<(), String> {
-    crate::http::ensure_tls_provider();
-    let client = reqwest::Client::builder()
+    let client = crate::http::client_builder()
         .build()
         .map_err(|err| format!("client proxy: {err}"))?;
     let mut builder = client.get(payload.url.clone());

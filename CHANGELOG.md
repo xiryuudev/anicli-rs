@@ -4,6 +4,20 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.7.1] - 2026-11-16
+
+### Diperbaiki
+
+- **`anicli update` panic di Android/Termux**:
+  `rustls-platform-verifier ... Expect rustls-platform-verifier to be initialized`.
+  Penyebabnya: `update::download_asset` (dan `android_proxy`) membuat
+  `reqwest::Client::builder()` langsung, sehingga jatuh ke verifier platform Android
+  yang butuh JNI. Sekarang **semua** client HTTP lewat `http::client_builder()` yang
+  memasang provider ring + TLS `webpki-roots`.
+- Ditambahkan test penjaga regresi (`tests/tls_guard.rs`) yang memindai `src/` dan
+  gagal bila ada `reqwest::Client::builder()` di luar `src/http.rs`, plus test bahwa
+  `client_builder()` bisa membentuk client.
+
 ## [0.7.0] - 2026-11-16
 
 ### Diperbaiki

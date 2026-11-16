@@ -326,6 +326,17 @@ impl HttpClient {
     }
 }
 
+/// `ClientBuilder` yang selalu memakai TLS webpki + provider ring.
+///
+/// **Gunakan ini untuk semua client baru.** `reqwest` dibangun dengan
+/// `rustls-no-provider`; kalau ada yang membuat `Client::builder()` langsung,
+/// di Android ia jatuh ke `rustls-platform-verifier` yang panic karena tidak
+/// punya JNI/Context (bug nyata pada `anicli update` 0.7.0).
+pub fn client_builder() -> reqwest::ClientBuilder {
+    ensure_tls_provider();
+    reqwest::Client::builder().use_preconfigured_tls(tls_config())
+}
+
 /// Konfigurasi TLS rustls dengan root CA statis (`webpki-roots`).
 ///
 /// Sengaja tidak memakai verifier bawaan reqwest: di Android verifier itu
@@ -345,14 +356,13 @@ pub fn tls_config() -> rustls::ClientConfig {
 }
 
 fn build_client(config: &HttpConfig, follow_redirects: bool) -> SourceResult<Client> {
-    let mut builder = Client::builder()
+    let mut builder = client_builder()
         .user_agent(config.user_agent.clone())
         .timeout(Duration::from_secs(config.timeout_secs.max(1)))
         .connect_timeout(Duration::from_secs(config.connect_timeout_secs.max(1)))
         .gzip(true)
         .brotli(true)
-        .cookie_store(true)
-        .use_preconfigured_tls(tls_config());
+        .cookie_store(true);
 
     if !follow_redirects {
         builder = builder.redirect(reqwest::redirect::Policy::none());

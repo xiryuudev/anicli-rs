@@ -169,9 +169,8 @@ pub fn asset_url(platform: Platform) -> SourceResult<Url> {
 
 /// Unduh aset dan tulis ke `dest` (boleh file sementara).
 pub async fn download_asset(platform: Platform, dest: &Path) -> SourceResult<u64> {
-    crate::http::ensure_tls_provider();
     let url = asset_url(platform)?;
-    let client = reqwest::Client::builder()
+    let client = crate::http::client_builder()
         .user_agent(format!("anicli-rs/{}", crate::VERSION))
         .build()
         .map_err(|err| SourceError::app(format!("gagal membuat client update: {err}")))?;
