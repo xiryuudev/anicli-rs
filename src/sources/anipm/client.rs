@@ -96,41 +96,18 @@ impl AniPm {
         self.detail(anime_url).await.map(|detail| detail.episodes)
     }
 
-    /// Stream: token player dari bootstrap + halaman tonton sebagai cadangan.
+    /// Stream: halaman tonton resmi (player situs butuh konteks browser).
+    ///
+    /// Token `settlar` dari `playback-bootstrap` hanya valid di dalam iframe halaman
+    /// ani.pm (dibuka langsung → `invalid-or-expired-embed-session`), jadi yang
+    /// disediakan adalah halaman tonton resminya; player dibuka di browser.
     pub async fn fetch_streams(&self, episode_url: &str) -> SourceResult<Vec<StreamLink>> {
         let base = self.base_url().await?;
         let page = Url::parse(episode_url).map_err(|err| {
             SourceError::parse(NAME, "episode", "url", format!("URL tidak valid: {err}"))
         })?;
-        let route = super::parse::route_id(&page).ok_or_else(|| {
-            SourceError::parse(NAME, "episode", "routeId", "tidak ada routeId di URL")
-        })?;
         let episode = super::parse::episode_number(&page).unwrap_or(1);
-
-        let mut links = Vec::new();
-        if let Ok(body) = self.bootstrap(&base, &route, episode).await {
-            if let Some(selection) = super::parse::parse_settlar_selection(&body) {
-                if let Ok(embed) =
-                    Url::parse(&format!("https://embed.settlar.io/embed/v1?t={selection}"))
-                {
-                    links.push(StreamLink {
-                        source: self.source.clone(),
-                        resolution: None,
-                        label: format!("Settlar — Episode {episode}"),
-                        server: crate::embed::classify_server(&embed),
-                        container: None,
-                        url: embed,
-                        headers: RequestHeaders {
-                            referer: Some(base.clone()),
-                            user_agent: Some(self.user_agent.clone()),
-                        },
-                        stream_kind: StreamKind::Embed,
-                    });
-                }
-            }
-        }
-
-        links.push(StreamLink {
+        Ok(vec![StreamLink {
             source: self.source.clone(),
             resolution: None,
             label: format!("Browser — Episode {episode}"),
@@ -142,8 +119,7 @@ impl AniPm {
                 user_agent: Some(self.user_agent.clone()),
             },
             stream_kind: StreamKind::Embed,
-        });
-        Ok(links)
+        }])
     }
 
     pub fn source_id(&self) -> &SourceId {

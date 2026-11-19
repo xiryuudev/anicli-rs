@@ -164,9 +164,15 @@ pub fn build_command(
 /// Cloudflare). Untuk host ini langsung buka browser daripada gagal `exit 2`.
 fn embed_requires_browser(url: &Url) -> bool {
     let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
-    ["settlar.io", "mkissa.to", "filelotion.fyi"]
-        .iter()
-        .any(|needle| host == *needle || host.ends_with(&format!(".{needle}")))
+    [
+        "settlar.io",
+        "ani.pm",
+        "ani.nz",
+        "mkissa.to",
+        "filelotion.fyi",
+    ]
+    .iter()
+    .any(|needle| host == *needle || host.ends_with(&format!(".{needle}")))
 }
 
 /// Rencana pemutaran: spawn player, buka browser (link embed), atau tolak dengan alasan.
@@ -532,6 +538,7 @@ mod tests {
         let ytdlp = fake_binary(tmp.path(), "yt-dlp");
         for host in [
             "https://embed.settlar.io/embed/v1?t=abc",
+            "https://ani.pm/anime/naruto-958-cfreps/episode-1",
             "https://mkissa.to/anime/x/p-1-sub",
         ] {
             let mut stream = link(StreamKind::Embed);

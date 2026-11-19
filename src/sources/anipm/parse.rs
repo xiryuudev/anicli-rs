@@ -127,12 +127,6 @@ struct RawCore {
 struct RawBootstrap {
     #[serde(default)]
     core: Option<RawCore>,
-    #[serde(default)]
-    availability: Option<serde_json::Value>,
-    #[serde(rename = "settlarSelection", default)]
-    settlar_selection: Option<String>,
-    #[serde(rename = "effectiveLanguage", default)]
-    effective_language: Option<String>,
 }
 
 /// Detail + daftar episode dari `playback-bootstrap`.
@@ -206,18 +200,6 @@ pub fn parse_detail(
         poster: core.poster.and_then(|src| base.join(&src).ok()),
         episodes,
     })
-}
-
-/// Token player (`embed.settlar.io?t=…`) dari respons bootstrap.
-pub fn parse_settlar_selection(json_text: &str) -> Option<String> {
-    let raw: RawBootstrap = serde_json::from_str(json_text).ok()?;
-    raw.settlar_selection
-        .filter(|value| !value.is_empty())
-        .or_else(|| {
-            let _ = raw.availability;
-            let _ = raw.effective_language;
-            None
-        })
 }
 
 /// `/anime/<routeId>[/episode-N]` → `routeId`.
@@ -304,13 +286,6 @@ mod tests {
         assert_eq!(detail.title, "Evangelion: 2.0 You Can (Not) Advance");
         assert_eq!(detail.kind, Some(MediaKind::Movie));
         assert_eq!(detail.episodes.len(), 1);
-    }
-
-    #[test]
-    fn settlar_token_is_extracted() {
-        let token =
-            parse_settlar_selection(&fixture("anipm/bootstrap.json")).expect("token settlar ada");
-        assert!(token.starts_with("2."), "{token}");
     }
 
     #[test]

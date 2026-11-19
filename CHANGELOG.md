@@ -4,6 +4,18 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.9.2] - 2026-11-20
+
+### Diperbaiki
+
+- **ani.pm: link `settlar` selalu error** `{"error":"invalid-or-expired-embed-session"}`
+  saat dibuka di luar halaman ani.pm. Token dari `playback-bootstrap` hanya valid di
+  dalam iframe halaman itu (sudah diuji: token segar + navigasi langsung di browser
+  yang sama tetap 401, termasuk dengan header `Referer`). Link settlar dihapus;
+  yang disediakan sekarang **halaman tonton resmi** (dibuka di browser) yang bekerja.
+- Host `ani.pm`/`ani.nz` ditambahkan ke daftar "browser-only" agar tidak dicoba lewat
+  `yt-dlp`/mpv (yang pasti gagal karena Cloudflare/SPA).
+
 ## [0.9.1] - 2026-11-20
 
 ### Diperbaiki
