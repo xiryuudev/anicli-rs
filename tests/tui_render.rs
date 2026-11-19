@@ -406,12 +406,23 @@ fn language_popup_filters_sources_and_switches_active() {
         app.language_filter,
         Some(anicli_rs::model::Language::English)
     );
-    // Source aktif harus pindah ke source EN pertama (ani.pm).
-    assert_eq!(app.source_name, "anipm");
-    // Order pencarian hanya berisi source EN.
+    // Source aktif harus source berbahasa Inggris (bisa ani.pm atau mkissa,
+    // tergantung urutan registry), dan order pencarian hanya EN.
+    let active = app
+        .registry
+        .get(&app.source_name)
+        .expect("source aktif ada");
+    assert_eq!(active.language(), anicli_rs::model::Language::English);
     let order = app.search_order();
-    assert!(!order.is_empty());
-    assert!(order.iter().all(|name| name == "anipm"), "{order:?}");
+    assert!(!order.is_empty(), "order tidak boleh kosong");
+    for name in &order {
+        let source = app.registry.get(name).expect("source ada di registry");
+        assert_eq!(
+            source.language(),
+            anicli_rs::model::Language::English,
+            "{order:?}"
+        );
+    }
 
     // Esc pada popup tidak mengubah filter.
     app.handle_input(key(KeyCode::Char('Y')), &tx);

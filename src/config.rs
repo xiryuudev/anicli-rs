@@ -45,6 +45,49 @@ pub struct Config {
     pub update: UpdateConfig,
 }
 
+/// Tambahkan source baru dari default bila belum ada di config user.
+///
+/// Mengembalikan nama source yang ditambahkan (untuk warning + disimpan).
+fn merge_new_sources(config: &mut Config) -> Vec<String> {
+    // Kalau user sengaja menonaktifkan semuanya, jangan tambah source baru:
+    // biarkan validasi yang memberi tahu (menghindari perilaku mengejutkan).
+    if !config.sources.values().any(|source| source.enabled) {
+        return Vec::new();
+    }
+    let defaults = Config::default();
+    let mut added = Vec::new();
+    for (name, default_source) in &defaults.sources {
+        if !config.sources.contains_key(name) {
+            config.sources.insert(name.clone(), default_source.clone());
+            added.push(name.clone());
+        }
+    }
+    if added.is_empty() {
+        return added;
+    }
+    added.sort();
+    for name in &added {
+        if config
+            .general
+            .fallback_order
+            .iter()
+            .any(|existing| existing == name)
+        {
+            continue;
+        }
+        match config
+            .general
+            .fallback_order
+            .iter()
+            .position(|existing| existing == "kusonime")
+        {
+            Some(index) => config.general.fallback_order.insert(index, name.clone()),
+            None => config.general.fallback_order.push(name.clone()),
+        }
+    }
+    added
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -95,6 +138,7 @@ impl Default for GeneralConfig {
                 "kotakanime".to_string(),
                 "anichin".to_string(),
                 "anipm".to_string(),
+                "mkissa".to_string(),
                 "kusonime".to_string(),
             ],
             language: "id".to_string(),
@@ -431,6 +475,14 @@ fn default_sources() -> BTreeMap<String, SourceConfig> {
         },
     );
     sources.insert(
+        "mkissa".to_string(),
+        SourceConfig {
+            enabled: true,
+            base_url: "https://mkissa.to".to_string(),
+            mirrors: Vec::new(),
+        },
+    );
+    sources.insert(
         "anoboy".to_string(),
         SourceConfig {
             enabled: true,
@@ -566,8 +618,16 @@ pub fn load(paths: &Paths) -> Result<LoadedConfig, ConfigError> {
         source,
     })?;
 
-    let warnings = migrate(&mut config)?;
-    let mut warnings = warnings;
+    let mut warnings = migrate(&mut config)?;
+    let added = merge_new_sources(&mut config);
+    if !added.is_empty() {
+        warnings.push(format!(
+            "source baru ditambahkan ke config: {} (hapus blok [sources.*] untuk menonaktifkan)",
+            added.join(", ")
+        ));
+        // Simpan sekali supaya migrasi tidak berulang tiap start.
+        config.save(path)?;
+    }
     warnings.extend(validate(&config)?);
 
     Ok(LoadedConfig {
@@ -955,7 +1015,7 @@ mod tests {
     fn template_parses() {
         let parsed: Config = toml::from_str(CONFIG_TEMPLATE).expect("template harus valid TOML");
         assert_eq!(parsed.config_version, CURRENT_CONFIG_VERSION);
-        assert_eq!(parsed.sources.len(), 9);
+        assert_eq!(parsed.sources.len(), 10);
         assert!(parsed.sources.keys().any(|name| name == "otakudesu"));
     }
 

@@ -47,6 +47,11 @@ enum RequestSpec<'a> {
         referer: Option<&'a Url>,
         fields: &'a [(&'a str, String)],
     },
+    PostJson {
+        url: &'a Url,
+        referer: Option<&'a Url>,
+        body: &'a str,
+    },
 }
 
 impl RequestSpec<'_> {
@@ -54,7 +59,8 @@ impl RequestSpec<'_> {
         match self {
             Self::Get { url, .. }
             | Self::PostForm { url, .. }
-            | Self::PostMultipart { url, .. } => url,
+            | Self::PostMultipart { url, .. }
+            | Self::PostJson { url, .. } => url,
         }
     }
 
@@ -62,7 +68,8 @@ impl RequestSpec<'_> {
         match self {
             Self::Get { referer, .. }
             | Self::PostForm { referer, .. }
-            | Self::PostMultipart { referer, .. } => *referer,
+            | Self::PostMultipart { referer, .. }
+            | Self::PostJson { referer, .. } => *referer,
         }
     }
 }
@@ -173,6 +180,22 @@ impl HttpClient {
             .map_err(|err| map_reqwest(source, "body", url, err))
     }
 
+    /// POST body JSON lalu kembalikan body teks (dipakai GraphQL `mkissa`).
+    pub async fn post_json_text(
+        &self,
+        source: &'static str,
+        url: &Url,
+        body: &str,
+        referer: Option<&Url>,
+    ) -> SourceResult<String> {
+        let spec = RequestSpec::PostJson { url, referer, body };
+        let response = self.execute(source, &spec, true).await?;
+        response
+            .text()
+            .await
+            .map_err(|err| map_reqwest(source, "body", url, err))
+    }
+
     /// POST `multipart/form-data` lalu kembalikan body teks (dipakai AJAX player KotakAnime).
     pub async fn post_multipart_text(
         &self,
@@ -272,6 +295,10 @@ impl HttpClient {
         let mut request = match spec {
             RequestSpec::Get { url, .. } => client.get((*url).clone()),
             RequestSpec::PostForm { url, form, .. } => client.post((*url).clone()).form(form),
+            RequestSpec::PostJson { url, body, .. } => client
+                .post((*url).clone())
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .body(body.to_string()),
             RequestSpec::PostMultipart { url, fields, .. } => {
                 let form = fields
                     .iter()

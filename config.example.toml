@@ -33,7 +33,7 @@ default_source = "samehadaku"
 # Urutan fallback saat source utama gagal (error jaringan, diblokir, parser rusak,
 # stream kosong). Source pertama dicoba, lalu berikutnya. Nama yang tidak dikenal
 # akan diabaikan dengan peringatan di log.
-fallback_order = ["samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kotakanime", "anichin", "anipm", "kusonime"]
+fallback_order = ["samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kotakanime", "anichin", "anipm", "mkissa", "kusonime"]
 
 # Bahasa antarmuka. Saat ini hanya "id".
 language = "id"
@@ -232,6 +232,12 @@ mirrors = ["https://www.anichin.blog"]
 enabled = true
 # Source berbahasa Inggris: pencarian lewat JSON API, player SPA belum didukung.
 base_url = "https://ani.pm"
+mirrors = []
+
+[sources.mkissa]
+enabled = true
+# Source English (GraphQL api.mkissa.net): search + daftar episode; stream butuh crypto.
+base_url = "https://mkissa.to"
 mirrors = []
 
 [sources.kusonime]

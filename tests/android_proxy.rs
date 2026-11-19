@@ -57,7 +57,10 @@ async fn proxy_injects_referer_and_user_agent() {
     };
     let proxied = android_proxy::proxy_url(&handle, &upstream_url, &headers).unwrap();
 
-    let client = reqwest::Client::new();
+    // Pakai client_builder agar provider TLS terpasang (reqwest-no-provider).
+    let client = anicli_rs::http::client_builder()
+        .build()
+        .expect("client proxy test");
     let response = client.get(&proxied).send().await.expect("permintaan proxy");
     assert!(
         response.status().is_success(),
@@ -91,7 +94,10 @@ async fn proxy_without_headers_forwards_plain_request() {
         android_proxy::proxy_url(&handle, &upstream_url, &ProxyHeaders::default()).unwrap();
 
     anicli_rs::http::ensure_tls_provider();
-    let client = reqwest::Client::new();
+    // Pakai client_builder agar provider TLS terpasang (reqwest-no-provider).
+    let client = anicli_rs::http::client_builder()
+        .build()
+        .expect("client proxy test");
     let response = client.get(&proxied).send().await.expect("permintaan proxy");
     assert!(response.status().is_success());
     let seen = seen.lock().unwrap();

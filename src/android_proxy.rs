@@ -79,26 +79,40 @@ pub fn start() -> Result<ProxyHandle, String> {
         token: token.clone(),
     };
 
-    tokio::spawn(async move {
-        let listener = match TcpListener::from_std(listener) {
-            Ok(listener) => listener,
-            Err(err) => {
-                tracing::warn!(target: "anicli_rs::proxy", %err, "gagal memulai listener proxy");
+    // Proxy berjalan di thread + runtime sendiri supaya hidupnya tidak bergantung
+    // pada runtime pemanggil (penting untuk test dan saat TUI di-restart).
+    std::thread::Builder::new()
+        .name("anicli-proxy".to_string())
+        .spawn(move || {
+            let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            else {
+                tracing::warn!(target: "anicli_rs::proxy", "gagal membuat runtime proxy");
                 return;
-            }
-        };
-        loop {
-            let Ok((socket, _)) = listener.accept().await else {
-                break;
             };
-            let token = token.clone();
-            tokio::spawn(async move {
-                if let Err(err) = serve_connection(socket, &token).await {
-                    tracing::debug!(target: "anicli_rs::proxy", %err, "koneksi proxy berakhir");
+            runtime.block_on(async move {
+                let listener = match TcpListener::from_std(listener) {
+                    Ok(listener) => listener,
+                    Err(err) => {
+                        tracing::warn!(target: "anicli_rs::proxy", %err, "gagal memulai listener proxy");
+                        return;
+                    }
+                };
+                loop {
+                    let Ok((socket, _)) = listener.accept().await else {
+                        break;
+                    };
+                    let token = token.clone();
+                    tokio::spawn(async move {
+                        if let Err(err) = serve_connection(socket, &token).await {
+                            tracing::debug!(target: "anicli_rs::proxy", %err, "koneksi proxy berakhir");
+                        }
+                    });
                 }
             });
-        }
-    });
+        })
+        .map_err(|err| format!("gagal spawn thread proxy: {err}"))?;
 
     *guard = Some(handle.clone());
     Ok(handle)

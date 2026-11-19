@@ -20,6 +20,7 @@ pub mod anipm;
 pub mod anoboy;
 pub mod kotakanime;
 pub mod kusonime;
+pub mod mkissa;
 pub mod mock;
 pub mod oploverz;
 pub mod otakudesu;
@@ -138,6 +139,10 @@ pub fn factories() -> &'static [SourceFactory] {
         SourceFactory {
             name: anipm::NAME,
             build: anipm::build,
+        },
+        SourceFactory {
+            name: mkissa::NAME,
+            build: mkissa::build,
         },
         SourceFactory {
             name: anoboy::NAME,
@@ -377,7 +382,7 @@ mod tests {
         let config = Config::default();
         let build = SourceRegistry::build(&config, &[]);
         assert!(build.registry.is_empty());
-        assert_eq!(build.missing.len(), 9);
+        assert_eq!(build.missing.len(), 10);
         assert!(build
             .warnings
             .iter()
@@ -401,7 +406,7 @@ mod tests {
         let build = SourceRegistry::build(&config, FACTORIES);
         assert_eq!(build.registry.len(), 1);
         assert_eq!(build.registry.names(), vec!["samehadaku"]);
-        assert_eq!(build.missing.len(), 8);
+        assert_eq!(build.missing.len(), 9);
     }
 
     #[test]
@@ -410,7 +415,7 @@ mod tests {
         config.sources.get_mut("samehadaku").unwrap().enabled = false;
         let build = SourceRegistry::build(&config, &[]);
         assert!(!build.missing.contains(&"samehadaku".to_string()));
-        assert_eq!(build.missing.len(), 8);
+        assert_eq!(build.missing.len(), 9);
     }
 
     #[tokio::test]

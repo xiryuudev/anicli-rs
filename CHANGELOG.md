@@ -4,6 +4,30 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.8.1] - 2026-11-19
+
+### Diperbaiki
+
+- **Source baru tidak muncul di config lama** (gejala: tab Bahasa menunjukkan
+  `[EN] 0` dan ani.pm tidak ada di daftar source). `Config::load` sekarang otomatis
+  menambahkan source default yang belum ada di `config.toml` user
+  (`merge_new_sources`), menyisipkannya ke `fallback_order` sebelum `kusonime`, dan
+  menyimpan config sekali. Jika user menonaktifkan **semua** source, migrasi tidak
+  dijalankan (biar validasi yang memberi tahu).
+- **Proxy Android/Termux kini berjalan di thread + runtime tokio sendiri**, jadi
+  hidupnya tidak bergantung pada runtime pemanggil (sebelumnya test/pemanggilan
+  berikutnya bisa gagal karena listener mati saat runtime pertama selesai).
+
+### Ditambahkan
+
+- **Mkissa** (`mkissa.to`) — source berbahasa Inggris. Website memakai SPA + challenge
+  JS, tetapi **API GraphQL** `api.mkissa.net/api` menerima query mentah
+  (introspection terbuka): `shows(search:{query})`, `show(_id)` dengan
+  `availableEpisodesDetail` (sub/dub) untuk daftar episode. Endpoint `episode`
+  memerlukan crypto klien (`AA_CRYPTO_MISSING`) → `streams = false` (jujur).
+  Terverifikasi live: `search("naruto")` 24 hasil, `search("mf ghost")` 13 episode.
+- Method HTTP `post_json_text` (GraphQL) + test parser Mkissa (search/detail/error).
+
 ## [0.8.0] - 2026-11-19
 
 ### Ditambahkan
