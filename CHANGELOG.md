@@ -4,6 +4,24 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.9.1] - 2026-11-20
+
+### Diperbaiki
+
+- **ani.pm "judul ini tidak tersedia (halaman kosong)" padahal ada**: halaman detail
+  ani.pm adalah SPA yang hanya **sebagian di-prerender**; untuk judul seperti
+  *Evangelion: 2.0 You Can (Not) Advance* server hanya mengirim shell
+  (`<title>ani.pm</title>`) tanpa LD+JSON, meski judulnya ada dan bisa diputar.
+  Detail + daftar episode + token player sekarang diambil dari **API JSON**
+  `playback-bootstrap` (`core` berisi metadata dan `episodes[]`), dengan fallback
+  `ep=1` → `ep=0`. HTML tidak lagi dipakai untuk detail.
+  Terverifikasi live: judul tersebut menghasilkan 1 episode + 2 link stream.
+
+### Ditambahkan
+
+- Fixture uji `anipm/bootstrap.json` (TV) dan `bootstrap_movie.json` (Movie) +
+  test bahwa halaman tanpa HTML ter-prerender tetap bisa dibaca.
+
 ## [0.9.0] - 2026-11-19
 
 ### Ditambahkan

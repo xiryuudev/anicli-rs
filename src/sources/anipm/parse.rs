@@ -1,17 +1,17 @@
 //! Parser murni ani.pm (source berbahasa Inggris).
 //!
-//! ani.pm adalah SPA, tapi menyediakan:
-//! - JSON API pencarian: `GET /api/anime/search?q=…` (`items[]`);
-//! - metadata di halaman detail lewat `<script type="application/ld+json">`
-//!   (`TVSeries`: name, alternateName, image, description, genre, numberOfEpisodes);
-//! - URL episode dapat dibentuk: `/anime/<routeId>/episode-<n>`.
+//! ani.pm adalah SPA: sebagian halaman detail tidak di-prerender sehingga HTML-nya
+//! hanya shell (`<title>ani.pm</title>`). Karena itu data diambil dari **API JSON**:
+//! - pencarian: `GET /api/anime/search?q=…`
+//! - detail + daftar episode + token player:
+//!   `GET /api/anime/playback-bootstrap/settlar/<routeId>?ep=<n>&lang=sub`
+//!   → `core` (metadata + `episodes[]`), `availability`, `settlarSelection`.
 
-use scraper::Html;
 use serde::Deserialize;
 use url::Url;
 
 use crate::error::{SourceError, SourceResult};
-use crate::model::{AiringStatus, AnimeDetail, AnimeSearchResult, Episode, MediaKind, SourceId};
+use crate::model::{AiringStatus, AnimeDetail, AnimeSearchResult, Episode, SourceId};
 use crate::sources::util;
 
 pub const NAME: &str = "anipm";
@@ -88,156 +88,160 @@ pub fn parse_search(
     Ok(results)
 }
 
-/// Metadata `TVSeries` dari LD+JSON halaman detail.
-#[derive(Debug, Default, serde::Deserialize)]
-struct LdSeries {
+/// `core.episodes[]` satu episode.
+#[derive(Debug, Deserialize)]
+struct RawEpisode {
     #[serde(default)]
-    name: String,
-    #[serde(rename = "alternateName", default)]
-    alternate_name: Option<String>,
+    number: Option<f64>,
     #[serde(default)]
-    description: Option<String>,
-    #[serde(default)]
-    image: Option<String>,
-    #[serde(default)]
-    genre: Vec<String>,
-    #[serde(rename = "datePublished", default)]
-    date_published: Option<String>,
+    title: Option<String>,
 }
 
-/// Parse halaman detail: LD+JSON + daftar episode yang dibentuk dari `numberOfEpisodes`.
+#[derive(Debug, Deserialize)]
+struct RawCore {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    native: Option<String>,
+    #[serde(default)]
+    synopsis: Option<String>,
+    #[serde(default)]
+    poster: Option<String>,
+    #[serde(default)]
+    genres: Vec<String>,
+    #[serde(default)]
+    year: Option<u16>,
+    #[serde(default)]
+    score: Option<f32>,
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(rename = "type", default)]
+    kind: Option<String>,
+    #[serde(rename = "episodeCount", default)]
+    episode_count: Option<u32>,
+    #[serde(default)]
+    episodes: Vec<RawEpisode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawBootstrap {
+    #[serde(default)]
+    core: Option<RawCore>,
+    #[serde(default)]
+    availability: Option<serde_json::Value>,
+    #[serde(rename = "settlarSelection", default)]
+    settlar_selection: Option<String>,
+    #[serde(rename = "effectiveLanguage", default)]
+    effective_language: Option<String>,
+}
+
+/// Detail + daftar episode dari `playback-bootstrap`.
 pub fn parse_detail(
-    html_text: &str,
+    json_text: &str,
     page_url: &Url,
     base: &Url,
     source: &SourceId,
 ) -> SourceResult<AnimeDetail> {
-    let document = Html::parse_document(html_text);
-    let mut series: Option<LdSeries> = None;
-    for script in crate::sources::util::select(&document, "script[type=\"application/ld+json\"]") {
-        let raw = script.text().collect::<String>();
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) else {
-            continue;
-        };
-        let is_series = value
-            .get("@type")
-            .and_then(|kind| kind.as_str())
-            .is_some_and(|kind| kind == "TVSeries" || kind == "Movie");
-        if !is_series {
-            continue;
-        }
-        if let Ok(parsed) = serde_json::from_value::<LdSeries>(value) {
-            series = Some(parsed);
-            break;
-        }
-    }
-
-    let series = match series {
-        Some(series) => series,
-        None => {
-            // ani.pm mengembalikan shell SPA untuk judul yang tidak punya halaman
-            // (mis. film yang tidak di-host): <title>ani.pm</title> tanpa metadata.
-            let page_title = crate::sources::util::select_first(&document, "title")
-                .map(|element| crate::sources::util::text(&element))
-                .unwrap_or_default();
-            if page_title.trim().eq_ignore_ascii_case("ani.pm") || page_title.is_empty() {
-                return Err(SourceError::not_found(
-                    NAME,
-                    "judul ini tidak tersedia di ani.pm (halaman kosong, bukan katalog)"
-                        .to_string(),
-                ));
-            }
-            return Err(SourceError::parse(
-                NAME,
-                PAGE_DETAIL,
-                "application/ld+json",
-                "metadata TVSeries tidak ditemukan di halaman detail",
-            ));
-        }
-    };
-    if series.name.trim().is_empty() {
+    let raw: RawBootstrap = serde_json::from_str(json_text).map_err(|err| {
+        SourceError::parse(
+            NAME,
+            PAGE_DETAIL,
+            "json",
+            format!("metadata bukan JSON (halaman mungkin tidak ada): {err}"),
+        )
+    })?;
+    let core = raw.core.ok_or_else(|| {
+        SourceError::not_found(NAME, "judul ini tidak punya metadata di ani.pm".to_string())
+    })?;
+    if core.title.trim().is_empty() {
         return Err(SourceError::parse(
             NAME,
             PAGE_DETAIL,
-            "name",
-            "judul kosong pada metadata",
+            "title",
+            "judul kosong",
         ));
     }
 
-    let episodes = parse_episode_links(&document, base);
-    // numberOfEpisodes bisa lebih kecil/lebih besar dari halaman episode yang benar
-    // (mis. film = 1, CM = 35); utamakan jumlah link nyata.
-    // Jangan memakai numberOfEpisodes untuk membentuk URL: halaman hanya memuat
-    // sebagian episode (mis. Naruto 120 dari 220) dan beberapa judul tidak di-host.
-    // Yang ditampilkan hanya episode yang benar-benar ada di halaman.
-    let total = u32::try_from(episodes.len()).unwrap_or(0);
-
-    let year = series
-        .date_published
-        .as_deref()
-        .and_then(|raw| raw.get(0..4))
-        .and_then(|year| year.parse::<u16>().ok());
+    let episodes: Vec<Episode> = core
+        .episodes
+        .iter()
+        .filter_map(|episode| {
+            let number = episode.number.map(|value| value as u32)?;
+            let url = base
+                .join(&format!(
+                    "/anime/{}/episode-{number}",
+                    route_id(page_url).unwrap_or_default()
+                ))
+                .ok()?;
+            Some(Episode {
+                number: Some(number),
+                label: episode
+                    .title
+                    .clone()
+                    .filter(|value| !value.trim().is_empty())
+                    .unwrap_or_else(|| format!("Episode {number}")),
+                title: episode.title.clone(),
+                url,
+                released: None,
+            })
+        })
+        .collect();
 
     Ok(AnimeDetail {
         source: source.clone(),
         url: page_url.clone(),
-        title: series.name,
-        alt_titles: series.alternate_name.into_iter().collect(),
-        synopsis: series.description.unwrap_or_default(),
-        genres: series.genre,
-        kind: Some(MediaKind::Tv),
-        status: AiringStatus::Unknown,
-        year,
-        score: None,
-        total_episodes: (total > 0).then_some(total),
-        poster: series.image.and_then(|src| base.join(&src).ok()),
+        title: core.title,
+        alt_titles: core.native.into_iter().collect(),
+        synopsis: core.synopsis.unwrap_or_default(),
+        genres: core.genres,
+        kind: core.kind.as_deref().map(util::media_kind),
+        status: core
+            .status
+            .as_deref()
+            .map(util::airing_status)
+            .unwrap_or(AiringStatus::Unknown),
+        year: core.year,
+        score: core.score,
+        total_episodes: core.episode_count,
+        poster: core.poster.and_then(|src| base.join(&src).ok()),
         episodes,
     })
 }
 
+/// Token player (`embed.settlar.io?t=…`) dari respons bootstrap.
+pub fn parse_settlar_selection(json_text: &str) -> Option<String> {
+    let raw: RawBootstrap = serde_json::from_str(json_text).ok()?;
+    raw.settlar_selection
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            let _ = raw.availability;
+            let _ = raw.effective_language;
+            None
+        })
+}
+
 /// `/anime/<routeId>[/episode-N]` → `routeId`.
-pub fn route_id_from_url(url: &Url) -> Option<String> {
+pub fn route_id(url: &Url) -> Option<String> {
     let segments: Vec<&str> = url.path_segments()?.collect();
     let index = segments.iter().position(|segment| *segment == "anime")?;
     segments.get(index + 1).map(|slug| (*slug).to_string())
 }
 
-/// Ambil episode dari link nyata di halaman detail (`/anime/<id>/episode-N`).
-fn parse_episode_links(document: &Html, base: &Url) -> Vec<Episode> {
-    let mut episodes: Vec<Episode> =
-        crate::sources::util::select(document, r#"a[href*="/episode-"]"#)
-            .iter()
-            .filter_map(|anchor| {
-                let href = crate::sources::util::attr(anchor, "href")?;
-                let url = crate::sources::util::abs_url(base, &href)?;
-                // path = "/anime/<id>/episode-12" → ambil angka dari segmen terakhir
-                // (`parse_episode_number` pada path penuh gagal karena "episode-12").
-                let segment = url
-                    .path_segments()
-                    .and_then(|mut segments| segments.next_back())
-                    .unwrap_or_default();
-                let number = segment
-                    .rsplit('-')
-                    .next()
-                    .and_then(|digits| digits.parse::<u32>().ok())
-                    .or_else(|| crate::sources::util::parse_episode_number(segment))?;
-                Some(Episode {
-                    number: Some(number),
-                    label: format!("Episode {number}"),
-                    title: None,
-                    url,
-                    released: None,
-                })
-            })
-            .collect();
-    episodes.sort_by_key(|episode| episode.number);
-    episodes.dedup_by_key(|episode| episode.number);
-    episodes
+/// `/anime/<routeId>/episode-<n>` → `<n>`.
+pub fn episode_number(url: &Url) -> Option<u32> {
+    let segments: Vec<&str> = url.path_segments()?.collect();
+    let index = segments.iter().position(|segment| *segment == "anime")?;
+    segments
+        .get(index + 2)?
+        .strip_prefix("episode-")?
+        .parse()
+        .ok()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::MediaKind;
 
     fn fixture(path: &str) -> String {
         let full = format!("{}/tests/fixtures/{path}", env!("CARGO_MANIFEST_DIR"));
@@ -262,21 +266,20 @@ mod tests {
     }
 
     #[test]
-    fn detail_uses_ld_json_and_builds_episodes() {
+    fn detail_from_bootstrap_has_all_episodes() {
         let page = base().join("/anime/naruto-958-cfreps").unwrap();
         let detail = parse_detail(
-            &fixture("anipm/detail.html"),
+            &fixture("anipm/bootstrap.json"),
             &page,
             &base(),
             &SourceId::new(NAME),
         )
         .unwrap();
         assert_eq!(detail.title, "Naruto");
-        assert!(detail.synopsis.to_lowercase().contains("naruto"));
+        assert!(!detail.synopsis.is_empty());
         assert!(!detail.genres.is_empty());
-        // Halaman 1 memuat 120 episode (sisanya lewat paginasi/JS di situs).
-        assert_eq!(detail.episodes.len(), 120);
-        assert_eq!(detail.total_episodes, Some(120));
+        assert_eq!(detail.total_episodes, Some(220));
+        assert_eq!(detail.episodes.len(), 220);
         assert_eq!(detail.episodes[0].number, Some(1));
         assert!(detail.episodes[0]
             .url
@@ -287,49 +290,33 @@ mod tests {
     }
 
     #[test]
-    fn detail_with_real_episode_links() {
+    fn movie_page_without_prerendered_html_still_works() {
         let page = base()
-            .join("/anime/japan-anima-tor-s-exhibition-1972-jexvbb")
+            .join("/anime/evangelion-2-0-you-can-not-advance-1431-eskifx")
             .unwrap();
         let detail = parse_detail(
-            &fixture("anipm/detail_episodes.html"),
+            &fixture("anipm/bootstrap_movie.json"),
             &page,
             &base(),
             &SourceId::new(NAME),
         )
         .unwrap();
-        assert_eq!(detail.episodes.len(), 35);
-        assert_eq!(detail.episodes[0].number, Some(1));
-        assert!(detail.episodes[0].url.as_str().ends_with("/episode-1"));
+        assert_eq!(detail.title, "Evangelion: 2.0 You Can (Not) Advance");
+        assert_eq!(detail.kind, Some(MediaKind::Movie));
+        assert_eq!(detail.episodes.len(), 1);
     }
 
     #[test]
-    fn missing_page_is_reported_as_not_found() {
-        let page = base()
-            .join("/anime/evangelion-2-0-you-can-not-advance-1431-eskifx")
-            .unwrap();
-        let err = parse_detail(
-            &fixture("anipm/not_found.html"),
-            &page,
-            &base(),
-            &SourceId::new(NAME),
-        )
-        .unwrap_err();
-        assert!(
-            err.user_message()
-                .to_lowercase()
-                .contains("tidak ditemukan"),
-            "{}",
-            err.user_message()
-        );
+    fn settlar_token_is_extracted() {
+        let token =
+            parse_settlar_selection(&fixture("anipm/bootstrap.json")).expect("token settlar ada");
+        assert!(token.starts_with("2."), "{token}");
     }
 
     #[test]
-    fn route_id_extraction() {
-        let url = base().join("/anime/one-piece-1642-slrfiu").unwrap();
-        assert_eq!(
-            route_id_from_url(&url).as_deref(),
-            Some("one-piece-1642-slrfiu")
-        );
+    fn route_and_episode_are_parsed_from_url() {
+        let url = base().join("/anime/naruto-958-cfreps/episode-12").unwrap();
+        assert_eq!(route_id(&url).as_deref(), Some("naruto-958-cfreps"));
+        assert_eq!(episode_number(&url), Some(12));
     }
 }

@@ -1,4 +1,5 @@
-//! Client ani.pm (English). Pencarian lewat JSON API; detail lewat LD+JSON.
+//! Client ani.pm (English) — pencarian lewat JSON API, detail/stream lewat
+//! `playback-bootstrap` (halaman HTML-nya SPA yang tidak selalu di-prerender).
 
 use std::sync::Arc;
 
@@ -49,6 +50,26 @@ impl AniPm {
         self.mirrors.resolve(&self.http, NAME).await
     }
 
+    async fn bootstrap(&self, base: &Url, route: &str, episode: u32) -> SourceResult<String> {
+        let path = format!("/api/anime/playback-bootstrap/settlar/{route}?ep={episode}&lang=sub");
+        let url = base.join(&path).map_err(|err| {
+            SourceError::parse(NAME, "detail", "url", format!("URL API tidak valid: {err}"))
+        })?;
+        self.http.get_text(NAME, &url, Some(base)).await
+    }
+
+    /// Ambil metadata: coba `ep=1`, lalu `ep=0` (judul tanpa episode bernomor 1).
+    async fn bootstrap_detail(&self, base: &Url, route: &str) -> SourceResult<String> {
+        match self.bootstrap(base, route, 1).await {
+            Ok(body) if body.contains("\"core\"") => Ok(body),
+            other => match self.bootstrap(base, route, 0).await {
+                Ok(body) if body.contains("\"core\"") => Ok(body),
+                Ok(_) => other,
+                Err(_) => other,
+            },
+        }
+    }
+
     pub async fn search(&self, query: &str) -> SourceResult<Vec<AnimeSearchResult>> {
         let base = self.base_url().await?;
         let mut url = base.join("/api/anime/search").map_err(|err| {
@@ -64,7 +85,10 @@ impl AniPm {
         let page_url = Url::parse(anime_url).map_err(|err| {
             SourceError::parse(NAME, "detail", "url", format!("URL tidak valid: {err}"))
         })?;
-        let body = self.http.get_text(NAME, &page_url, Some(&base)).await?;
+        let route = super::parse::route_id(&page_url).ok_or_else(|| {
+            SourceError::parse(NAME, "detail", "routeId", "tidak ada routeId di URL")
+        })?;
+        let body = self.bootstrap_detail(&base, &route).await?;
         super::parse::parse_detail(&body, &page_url, &base, &self.source)
     }
 
@@ -72,66 +96,40 @@ impl AniPm {
         self.detail(anime_url).await.map(|detail| detail.episodes)
     }
 
-    /// Pecah `/anime/<route>/episode-<n>` → (route, n).
-    fn split_episode(url: &Url) -> Option<(String, u32)> {
-        let segments: Vec<&str> = url.path_segments()?.collect();
-        let index = segments.iter().position(|segment| *segment == "anime")?;
-        let route = segments.get(index + 1)?.to_string();
-        let episode = segments
-            .get(index + 2)?
-            .strip_prefix("episode-")?
-            .parse::<u32>()
-            .ok()?;
-        Some((route, episode))
-    }
-
-    /// Stream ani.pm: API `playback-bootstrap` memberi token player `embed.settlar.io`.
-    ///
-    /// Token berlaku singkat, jadi diambil saat user menekan Enter (bukan saat
-    /// daftar episode dimuat).
+    /// Stream: token player dari bootstrap + halaman tonton sebagai cadangan.
     pub async fn fetch_streams(&self, episode_url: &str) -> SourceResult<Vec<StreamLink>> {
         let base = self.base_url().await?;
         let page = Url::parse(episode_url).map_err(|err| {
             SourceError::parse(NAME, "episode", "url", format!("URL tidak valid: {err}"))
         })?;
-        let (route, episode) = Self::split_episode(&page).ok_or_else(|| {
-            SourceError::parse(NAME, "episode", "url", "URL episode tidak dikenali")
+        let route = super::parse::route_id(&page).ok_or_else(|| {
+            SourceError::parse(NAME, "episode", "routeId", "tidak ada routeId di URL")
         })?;
+        let episode = super::parse::episode_number(&page).unwrap_or(1);
 
         let mut links = Vec::new();
-        let bootstrap_path =
-            format!("/api/anime/playback-bootstrap/settlar/{route}?ep={episode}&lang=sub");
-        if let Ok(api) = base.join(&bootstrap_path) {
-            if let Ok(body) = self.http.get_text(NAME, &api, Some(&base)).await {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
-                    if let Some(selection) = json
-                        .get("settlarSelection")
-                        .and_then(|value| value.as_str())
-                        .filter(|value| !value.is_empty())
-                    {
-                        if let Ok(embed) =
-                            Url::parse(&format!("https://embed.settlar.io/embed/v1?t={selection}"))
-                        {
-                            links.push(StreamLink {
-                                source: self.source.clone(),
-                                resolution: None,
-                                label: format!("Settlar — Episode {episode}"),
-                                server: crate::embed::classify_server(&embed),
-                                container: None,
-                                url: embed,
-                                headers: RequestHeaders {
-                                    referer: Some(base.clone()),
-                                    user_agent: Some(self.user_agent.clone()),
-                                },
-                                stream_kind: StreamKind::Embed,
-                            });
-                        }
-                    }
+        if let Ok(body) = self.bootstrap(&base, &route, episode).await {
+            if let Some(selection) = super::parse::parse_settlar_selection(&body) {
+                if let Ok(embed) =
+                    Url::parse(&format!("https://embed.settlar.io/embed/v1?t={selection}"))
+                {
+                    links.push(StreamLink {
+                        source: self.source.clone(),
+                        resolution: None,
+                        label: format!("Settlar — Episode {episode}"),
+                        server: crate::embed::classify_server(&embed),
+                        container: None,
+                        url: embed,
+                        headers: RequestHeaders {
+                            referer: Some(base.clone()),
+                            user_agent: Some(self.user_agent.clone()),
+                        },
+                        stream_kind: StreamKind::Embed,
+                    });
                 }
             }
         }
 
-        // Selalu sediakan halaman tonton resmi sebagai cadangan (browser).
         links.push(StreamLink {
             source: self.source.clone(),
             resolution: None,
