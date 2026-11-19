@@ -140,7 +140,18 @@ async fn download(
         .await
         .map_err(|err| format!("permintaan gagal: {err}"))?;
     if !response.status().is_success() {
-        return Err(format!("server menolak (HTTP {})", response.status()));
+        let status = response.status().as_u16();
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "server menolak: {}",
+            crate::http::describe_response_error(status, &content_type, &body)
+        ));
     }
     let total = response.content_length();
 

@@ -103,8 +103,6 @@ struct LdSeries {
     genre: Vec<String>,
     #[serde(rename = "datePublished", default)]
     date_published: Option<String>,
-    #[serde(rename = "numberOfEpisodes", default)]
-    number_of_episodes: Option<u32>,
 }
 
 /// Parse halaman detail: LD+JSON + daftar episode yang dibentuk dari `numberOfEpisodes`.
@@ -134,14 +132,29 @@ pub fn parse_detail(
         }
     }
 
-    let series = series.ok_or_else(|| {
-        SourceError::parse(
-            NAME,
-            PAGE_DETAIL,
-            "application/ld+json",
-            "metadata TVSeries tidak ditemukan di halaman detail",
-        )
-    })?;
+    let series = match series {
+        Some(series) => series,
+        None => {
+            // ani.pm mengembalikan shell SPA untuk judul yang tidak punya halaman
+            // (mis. film yang tidak di-host): <title>ani.pm</title> tanpa metadata.
+            let page_title = crate::sources::util::select_first(&document, "title")
+                .map(|element| crate::sources::util::text(&element))
+                .unwrap_or_default();
+            if page_title.trim().eq_ignore_ascii_case("ani.pm") || page_title.is_empty() {
+                return Err(SourceError::not_found(
+                    NAME,
+                    "judul ini tidak tersedia di ani.pm (halaman kosong, bukan katalog)"
+                        .to_string(),
+                ));
+            }
+            return Err(SourceError::parse(
+                NAME,
+                PAGE_DETAIL,
+                "application/ld+json",
+                "metadata TVSeries tidak ditemukan di halaman detail",
+            ));
+        }
+    };
     if series.name.trim().is_empty() {
         return Err(SourceError::parse(
             NAME,
@@ -151,9 +164,13 @@ pub fn parse_detail(
         ));
     }
 
-    let route_id = route_id_from_url(page_url).unwrap_or_default();
-    let total = series.number_of_episodes.unwrap_or(0);
-    let episodes = build_episodes(base, &route_id, total);
+    let episodes = parse_episode_links(&document, base);
+    // numberOfEpisodes bisa lebih kecil/lebih besar dari halaman episode yang benar
+    // (mis. film = 1, CM = 35); utamakan jumlah link nyata.
+    // Jangan memakai numberOfEpisodes untuk membentuk URL: halaman hanya memuat
+    // sebagian episode (mis. Naruto 120 dari 220) dan beberapa judul tidak di-host.
+    // Yang ditampilkan hanya episode yang benar-benar ada di halaman.
+    let total = u32::try_from(episodes.len()).unwrap_or(0);
 
     let year = series
         .date_published
@@ -185,25 +202,37 @@ pub fn route_id_from_url(url: &Url) -> Option<String> {
     segments.get(index + 1).map(|slug| (*slug).to_string())
 }
 
-/// Bentuk daftar episode `n = 1..=total`.
-pub fn build_episodes(base: &Url, route_id: &str, total: u32) -> Vec<Episode> {
-    if route_id.is_empty() || total == 0 {
-        return Vec::new();
-    }
-    (1..=total)
-        .filter_map(|number| {
-            let url = base
-                .join(&format!("/anime/{route_id}/episode-{number}"))
-                .ok()?;
-            Some(Episode {
-                number: Some(number),
-                label: format!("Episode {number}"),
-                title: None,
-                url,
-                released: None,
+/// Ambil episode dari link nyata di halaman detail (`/anime/<id>/episode-N`).
+fn parse_episode_links(document: &Html, base: &Url) -> Vec<Episode> {
+    let mut episodes: Vec<Episode> =
+        crate::sources::util::select(document, r#"a[href*="/episode-"]"#)
+            .iter()
+            .filter_map(|anchor| {
+                let href = crate::sources::util::attr(anchor, "href")?;
+                let url = crate::sources::util::abs_url(base, &href)?;
+                // path = "/anime/<id>/episode-12" → ambil angka dari segmen terakhir
+                // (`parse_episode_number` pada path penuh gagal karena "episode-12").
+                let segment = url
+                    .path_segments()
+                    .and_then(|mut segments| segments.next_back())
+                    .unwrap_or_default();
+                let number = segment
+                    .rsplit('-')
+                    .next()
+                    .and_then(|digits| digits.parse::<u32>().ok())
+                    .or_else(|| crate::sources::util::parse_episode_number(segment))?;
+                Some(Episode {
+                    number: Some(number),
+                    label: format!("Episode {number}"),
+                    title: None,
+                    url,
+                    released: None,
+                })
             })
-        })
-        .collect()
+            .collect();
+    episodes.sort_by_key(|episode| episode.number);
+    episodes.dedup_by_key(|episode| episode.number);
+    episodes
 }
 
 #[cfg(test)]
@@ -245,8 +274,9 @@ mod tests {
         assert_eq!(detail.title, "Naruto");
         assert!(detail.synopsis.to_lowercase().contains("naruto"));
         assert!(!detail.genres.is_empty());
-        assert_eq!(detail.total_episodes, Some(220));
-        assert_eq!(detail.episodes.len(), 220);
+        // Halaman 1 memuat 120 episode (sisanya lewat paginasi/JS di situs).
+        assert_eq!(detail.episodes.len(), 120);
+        assert_eq!(detail.total_episodes, Some(120));
         assert_eq!(detail.episodes[0].number, Some(1));
         assert!(detail.episodes[0]
             .url
@@ -254,6 +284,44 @@ mod tests {
             .ends_with("/anime/naruto-958-cfreps/episode-1"));
         assert!(detail.poster.is_some());
         assert_eq!(detail.year, Some(2002));
+    }
+
+    #[test]
+    fn detail_with_real_episode_links() {
+        let page = base()
+            .join("/anime/japan-anima-tor-s-exhibition-1972-jexvbb")
+            .unwrap();
+        let detail = parse_detail(
+            &fixture("anipm/detail_episodes.html"),
+            &page,
+            &base(),
+            &SourceId::new(NAME),
+        )
+        .unwrap();
+        assert_eq!(detail.episodes.len(), 35);
+        assert_eq!(detail.episodes[0].number, Some(1));
+        assert!(detail.episodes[0].url.as_str().ends_with("/episode-1"));
+    }
+
+    #[test]
+    fn missing_page_is_reported_as_not_found() {
+        let page = base()
+            .join("/anime/evangelion-2-0-you-can-not-advance-1431-eskifx")
+            .unwrap();
+        let err = parse_detail(
+            &fixture("anipm/not_found.html"),
+            &page,
+            &base(),
+            &SourceId::new(NAME),
+        )
+        .unwrap_err();
+        assert!(
+            err.user_message()
+                .to_lowercase()
+                .contains("tidak ditemukan"),
+            "{}",
+            err.user_message()
+        );
     }
 
     #[test]

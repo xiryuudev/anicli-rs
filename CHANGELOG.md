@@ -4,6 +4,34 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.8.2] - 2026-11-19
+
+### Diperbaiki
+
+- **ani.pm**: banyak judul gagal ("parser tidak menemukan ld+json") karena ani.pm
+  mengembalikan halaman 404 berupa shell SPA (`<title>ani.pm</title>`) untuk judul yang
+  tidak di-host. Sekarang terdeteksi sebagai **"tidak ditemukan"** dengan pesan jelas,
+  bukan error parser yang membingungkan.
+- **ani.pm: daftar episode** sebelumnya dibentuk dari `numberOfEpisodes` sehingga bisa
+  memunculkan episode yang tidak ada. Sekarang diambil dari **link episode nyata** di
+  halaman detail (`a[href*="/episode-"]`), mis. Naruto menampilkan 120 episode halaman
+  pertama dan Japan Anima(tor)'s Exhibition 35 episode; tidak ada lagi URL karangan.
+- **Pesan error host tidak informatif** (mis. Pixeldrain takedown hanya
+  `mpv exit 2`). Ditambahkan preflight untuk host rawan takedown
+  (pixeldrain/mediafire/filedon/acefile) yang membaca respons: Pixeldrain mengembalikan
+  **HTTP 451 + JSON** `{"message":"…takedown report","extra":{"type":"copyright"}}` →
+  pesan UI menjadi `Link pixeldrain.com tidak bisa diputar: HTTP 451 — … (copyright)`.
+  Unduhan langsung juga menampilkan alasan ini, bukan sekadar "server menolak".
+- **Ringkasan fallback tidak lagi penuh "tidak didukung"**: source katalog (ani.pm,
+  mkissa) tidak lagi mendominasi pesan "Semua source gagal"; yang ditampilkan hanya
+  percobaan yang informatif.
+
+### Ditambahkan
+
+- `http::describe_response_error` (JSON `message`/`extra.type`, halaman HTML
+  "Unavailable for legal reasons") + test.
+- Test parser ani.pm: episode nyata (35 link), halaman 404, dan penanganan error.
+
 ## [0.8.1] - 2026-11-19
 
 ### Diperbaiki

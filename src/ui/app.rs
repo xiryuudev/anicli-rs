@@ -1543,7 +1543,17 @@ impl App {
                 let tx = tx.clone();
                 let command_for_log = command.clone();
                 let foreground = self.config.playback.foreground;
+                let link_for_preflight = link.clone();
                 tokio::spawn(async move {
+                    // Deteksi takedown/host menolak sebelum mpv dijalankan, supaya
+                    // pesan errornya jelas (bukan cuma "exit 2").
+                    if let Some(message) = player::preflight_direct(&link_for_preflight).await {
+                        let _ = tx.send(AppEvent::Failed {
+                            job,
+                            error: crate::error::SourceError::app(message),
+                        });
+                        return;
+                    }
                     match player::spawn_player(&command_for_log, foreground).await {
                         Ok(child) => {
                             let _ = tx.send(AppEvent::PlayerStarted {
@@ -1852,10 +1862,26 @@ impl App {
 
 /// Ringkas jejak fallback untuk status bar.
 fn attempt_summary(attempts: &[Attempt]) -> String {
-    if attempts.len() <= 1 {
+    // "tidak didukung" = source katalog (tanpa player); jangan memenuhi pesan
+    // error kalau ada percobaan lain yang lebih informatif.
+    let informative: Vec<&Attempt> = attempts
+        .iter()
+        .filter(|attempt| {
+            !matches!(
+                attempt.outcome,
+                crate::fallback::AttemptOutcome::Unsupported
+            )
+        })
+        .collect();
+    let chosen: Vec<&Attempt> = if informative.is_empty() {
+        attempts.iter().collect()
+    } else {
+        informative
+    };
+    if chosen.len() <= 1 && attempts.len() <= 1 {
         return String::new();
     }
-    attempts
+    chosen
         .iter()
         .map(|attempt| format!("{} {}", attempt.source, attempt.outcome.label()))
         .collect::<Vec<_>>()

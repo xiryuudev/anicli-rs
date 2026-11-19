@@ -348,7 +348,9 @@ pub fn summarize_stderr(stderr: &str, max_chars: usize) -> String {
         .rev()
         .find(|line| !noisy.iter().any(|prefix| line.starts_with(prefix)))
         .or_else(|| stderr.lines().map(str::trim).find(|line| !line.is_empty()))
-        .unwrap_or("tanpa detail");
+        .unwrap_or(
+            "tidak ada output dari mpv — kemungkinan URL ditolak server atau codec tidak didukung",
+        );
     let mut text = line.to_string();
     if text.chars().count() > max_chars {
         text = text.chars().take(max_chars).collect::<String>() + "…";
@@ -357,6 +359,85 @@ pub fn summarize_stderr(stderr: &str, max_chars: usize) -> String {
 }
 
 /// Buka URL di browser default (untuk link embed yang tidak bisa diputar langsung).
+/// Cek cepat apakah link Direct masih bisa diakses.
+///
+/// Banyak host file (mis. Pixeldrain) mengembalikan 200/404 dengan halaman
+/// "Unavailable for legal reasons" untuk berkas yang di-takedown. Tanpa cek ini,
+/// mpv hanya gagal dengan `exit 2` tanpa detail. Mengembalikan pesan error yang
+/// jelas bila link tidak bisa diputar.
+pub async fn preflight_direct(link: &StreamLink) -> Option<String> {
+    if link.stream_kind != StreamKind::Direct {
+        return None;
+    }
+    let url = link.url.clone();
+    if !matches!(url.scheme(), "http" | "https") {
+        return None;
+    }
+    // Hanya host file-sharing yang umum menampilkan halaman takedown/HTML. Cek
+    // untuk semua host berisiko memblokir link valid karena 429/rate limit.
+    let host_lower = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    let taken_down_prone = ["pixeldrain", "mediafire", "filedon", "acefile"];
+    if !taken_down_prone
+        .iter()
+        .any(|needle| host_lower.contains(needle))
+    {
+        return None;
+    }
+    crate::http::ensure_tls_provider();
+    let client = crate::http::client_builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .ok()?;
+    let mut request = client
+        .get(url.clone())
+        .header(reqwest::header::RANGE, "bytes=0-2047")
+        .header(
+            reqwest::header::USER_AGENT,
+            link.headers
+                .user_agent
+                .clone()
+                .unwrap_or_else(|| "Mozilla/5.0 (anicli-rs)".to_string()),
+        );
+    if let Some(referer) = &link.headers.referer {
+        request = request.header(reqwest::header::REFERER, referer.as_str());
+    }
+    let response = request.send().await.ok()?;
+    let status = response.status();
+    let host = url.host_str().unwrap_or("host").to_string();
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+    if !status.is_success() && status.as_u16() != 206 {
+        let body = response.text().await.unwrap_or_default();
+        let detail = crate::http::describe_response_error(status.as_u16(), &content_type, &body);
+        return Some(format!(
+            "Link {host} tidak bisa diputar: {detail}. \
+             Pilih server lain (r) atau source lain (s)."
+        ));
+    }
+    // Halaman HTML (bukan media) biasanya berarti takedown/blokir.
+    if content_type.contains("text/html") {
+        let body = response.text().await.unwrap_or_default();
+        let lowered = body.to_lowercase();
+        let reason = if lowered.contains("unavailable for legal reasons")
+            || lowered.contains("removed") && lowered.contains("copyright")
+        {
+            "file dihapus karena laporan copyright (takedown)"
+        } else if lowered.contains("not found") || lowered.contains("404") {
+            "file tidak ditemukan di host"
+        } else {
+            "host mengembalikan halaman HTML, bukan berkas video"
+        };
+        return Some(format!(
+            "Link {host} tidak bisa diputar: {reason}. Pilih server lain (r) atau source lain (s)."
+        ));
+    }
+    None
+}
+
 pub fn open_browser(url: &str) -> SourceResult<()> {
     // Android/Termux tidak punya xdg-open: gunakan termux-open-url.
     if android::is_termux() {

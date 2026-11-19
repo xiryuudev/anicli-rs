@@ -85,6 +85,51 @@ pub struct HttpClient {
     last_hit: Arc<std::sync::Mutex<HashMap<String, Instant>>>,
 }
 
+/// Terjemahkan respons error host menjadi pesan yang berguna untuk user.
+///
+/// Pixeldrain (dan host serupa) mengembalikan JSON seperti
+/// `{"success":false,"message":"…","extra":{"type":"copyright"}}` dengan status 451,
+/// sedangkan situs lain memakai halaman HTML "Unavailable for legal reasons".
+pub fn describe_response_error(status: u16, content_type: &str, body: &str) -> String {
+    let lowered = body.to_lowercase();
+    let reason = if content_type.contains("json") {
+        serde_json::from_str::<serde_json::Value>(body)
+            .ok()
+            .and_then(|value| {
+                let message = value
+                    .get("message")
+                    .and_then(|item| item.as_str())
+                    .map(str::to_string)
+                    .or_else(|| {
+                        value
+                            .get("value")
+                            .and_then(|item| item.as_str())
+                            .map(str::to_string)
+                    })?;
+                let kind = value
+                    .pointer("/extra/type")
+                    .and_then(|item| item.as_str())
+                    .unwrap_or_default();
+                Some(if kind.is_empty() {
+                    message
+                } else {
+                    format!("{message} ({kind})")
+                })
+            })
+    } else if lowered.contains("unavailable for legal reasons")
+        || (lowered.contains("removed") && lowered.contains("copyright"))
+    {
+        Some("file dihapus karena laporan copyright (takedown)".to_string())
+    } else {
+        None
+    };
+
+    match reason {
+        Some(reason) => format!("HTTP {status} — {reason}"),
+        None => format!("HTTP {status}"),
+    }
+}
+
 /// Pasang provider TLS ring sebagai default proses (idempotent).
 ///
 /// `reqwest` dibangun dengan `rustls-no-provider` agar tidak memaksa `aws-lc-rs`
@@ -579,6 +624,33 @@ pub fn referer_header(url: &Url) -> Option<HeaderValue> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn pixeldrain_takedown_json_becomes_clear_message() {
+        let body = r#"{"success":false,"value":"unavailable_for_legal_reasons","message":"This file cannot be downloaded because it has received a takedown report","extra":{"type":"copyright"}}"#;
+        let message = super::describe_response_error(451, "application/json", body);
+        assert!(message.contains("451"), "{message}");
+        assert!(message.to_lowercase().contains("takedown"), "{message}");
+        assert!(message.contains("copyright"), "{message}");
+    }
+
+    #[test]
+    fn html_legal_reasons_is_recognised() {
+        let message = super::describe_response_error(
+            403,
+            "text/html",
+            "<h2>Unavailable for legal reasons</h2>",
+        );
+        assert!(message.contains("copyright"), "{message}");
+    }
+
+    #[test]
+    fn unknown_error_body_falls_back_to_status() {
+        assert_eq!(
+            super::describe_response_error(500, "text/plain", "oops"),
+            "HTTP 500"
+        );
+    }
 
     #[test]
     fn tls_config_sets_alpn_and_static_roots() {
