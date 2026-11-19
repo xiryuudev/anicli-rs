@@ -64,13 +64,20 @@ pub fn parse_list(
         });
     }
 
-    if results.is_empty() && !html_text.contains("class=\"bsx\"") {
-        return Err(SourceError::parse(
-            NAME,
-            PAGE_LIST,
-            "div.bsx a.tip",
-            "tidak ada kartu donghua di halaman ini",
-        ));
+    if results.is_empty() {
+        // Halaman tanpa hasil memakai layout lain ("Tidak ditemukan"), bukan error.
+        let lowered = html_text.to_lowercase();
+        let no_results = lowered.contains("tidak ditemukan")
+            || lowered.contains("nothing found")
+            || html_text.contains("listupd");
+        if !no_results {
+            return Err(SourceError::parse(
+                NAME,
+                PAGE_LIST,
+                "div.bsx a.tip",
+                "tidak ada kartu donghua di halaman ini",
+            ));
+        }
     }
     Ok(results)
 }
@@ -205,6 +212,12 @@ mod tests {
             .iter()
             .all(|item| item.url.as_str().contains("/series/")));
         assert!(items[0].thumbnail.is_some());
+    }
+
+    #[test]
+    fn empty_search_is_not_a_parse_error() {
+        let items = parse_list(&fixture("anichin/search_empty.html"), &base(), &id()).unwrap();
+        assert!(items.is_empty());
     }
 
     #[test]

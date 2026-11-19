@@ -60,9 +60,11 @@ echo "== registry =="
 ./anicli-x86_64-linux --no-tui 2>&1 | grep -E "installed|fallback" | head -3
 
 status=0
-for source in anichin anipm mkissa samehadaku otakudesu; do
-  echo "== $source =="
-  if ./sourcecheck-x86_64-linux --source "$source" --query "naruto" 2>&1 | tee "$source.log" | grep -E "^search|^detail|^judul|^episodes|^streams|^  - Episode 1 |tidak|gagal" | head -8
+# kueri per source: anichin = donghua, lainnya anime umum
+for spec in "anichin:martial" "anipm:naruto" "mkissa:mf ghost" "samehadaku:naruto" "otakudesu:boruto"; do
+  source="${spec%%:*}"; query="${spec#*:}"
+  echo "== $source (q=$query) =="
+  if ./sourcecheck-x86_64-linux --source "$source" --query "$query" 2>&1 | tee "$source.log" | grep -E "^search|^detail|^judul|^episodes|^streams|^  - Episode 1 |tidak|gagal" | head -8
   then :; else status=1; fi
   if grep -qE "^(search|episodes) *: 0|tidak didukung|panik|panicked" "$source.log"; then
     echo "  !! masalah pada $source"
