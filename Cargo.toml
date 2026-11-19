@@ -1,6 +1,6 @@
 [package]
 name = "anicli-rs"
-version = "0.8.2"
+version = "0.9.0"
 edition = "2021"
 rust-version = "1.88"
 # Resolver 3 = MSRV-aware: Cargo memilih versi dependency yang kompatibel dengan

@@ -8,7 +8,9 @@ use url::Url;
 use crate::config::{Config, SourceConfig};
 use crate::error::{SourceError, SourceResult};
 use crate::http::{HttpClient, MirrorSet};
-use crate::model::{AnimeDetail, AnimeSearchResult, Episode, SourceId};
+use crate::model::{
+    AnimeDetail, AnimeSearchResult, Episode, RequestHeaders, SourceId, StreamKind, StreamLink,
+};
 
 pub const NAME: &str = "mkissa";
 pub const DEFAULT_BASE: &str = "https://mkissa.to";
@@ -85,6 +87,38 @@ impl Mkissa {
 
     pub async fn episodes(&self, anime_url: &str) -> SourceResult<Vec<Episode>> {
         self.detail(anime_url).await.map(|detail| detail.episodes)
+    }
+
+    /// Link putar: halaman tonton resmi situs (`/anime/<id>/p-<n>-sub`).
+    ///
+    /// Stream asli memerlukan signature `aaReq` (crypto klien), jadi paling jujur
+    /// dan stabil adalah membuka halaman tontonnya (player resmi) di browser.
+    pub async fn fetch_streams(
+        &self,
+        episode_url: &str,
+    ) -> crate::error::SourceResult<Vec<StreamLink>> {
+        let base = self.base_url().await?;
+        let url = Url::parse(episode_url).map_err(|err| {
+            SourceError::parse(NAME, "episode", "url", format!("URL tidak valid: {err}"))
+        })?;
+        let label = url
+            .path_segments()
+            .and_then(|mut segments| segments.next_back())
+            .unwrap_or("episode")
+            .to_string();
+        Ok(vec![StreamLink {
+            source: self.source.clone(),
+            resolution: None,
+            label: format!("Browser — {label}"),
+            server: crate::embed::classify_server(&url),
+            container: None,
+            url,
+            headers: RequestHeaders {
+                referer: Some(base.clone()),
+                user_agent: None,
+            },
+            stream_kind: StreamKind::Embed,
+        }])
     }
 
     pub fn source_id(&self) -> &SourceId {

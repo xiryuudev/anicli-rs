@@ -201,7 +201,8 @@ fn episodes_from_available(show: &serde_json::Value, base: &Url, id: &str) -> Ve
         .into_iter()
         .filter_map(|number| {
             let parsed = util::parse_episode_number(&number);
-            let url = base.join(&format!("/anime/{id}/episode-{number}")).ok()?;
+            // Route asli situs: /anime/<id>/p-<ep>-sub
+            let url = base.join(&format!("/anime/{id}/p-{number}-sub")).ok()?;
             Some(Episode {
                 number: parsed,
                 label: format!("Episode {number}"),
@@ -285,7 +286,7 @@ mod tests {
         assert!(detail.episodes[0]
             .url
             .as_str()
-            .contains("/anime/u85xuZjGw7eb6u3um/episode-1"));
+            .contains("/anime/u85xuZjGw7eb6u3um/p-1-sub"));
         assert!(detail.poster.is_some());
     }
 

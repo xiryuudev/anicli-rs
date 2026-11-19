@@ -12,6 +12,7 @@ use tokio::process::{Child, Command};
 use crate::config::{AndroidPlayer, Config, EmbedStrategy, Player as PlayerKind};
 use crate::error::{SourceError, SourceResult};
 use crate::model::{StreamKind, StreamLink};
+use url::Url;
 
 pub mod android;
 
@@ -159,6 +160,15 @@ pub fn build_command(
     }
 }
 
+/// Host yang player embed-nya tidak bisa diambil `yt-dlp`/mpv (token sesi browser,
+/// Cloudflare). Untuk host ini langsung buka browser daripada gagal `exit 2`.
+fn embed_requires_browser(url: &Url) -> bool {
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    ["settlar.io", "mkissa.to", "filelotion.fyi"]
+        .iter()
+        .any(|needle| host == *needle || host.ends_with(&format!(".{needle}")))
+}
+
 /// Rencana pemutaran: spawn player, buka browser (link embed), atau tolak dengan alasan.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlaybackPlan {
@@ -231,6 +241,13 @@ pub fn plan_playback_with(
         }
         StreamKind::Direct => {}
         StreamKind::Embed => {
+            if embed_requires_browser(&link.url) {
+                return PlaybackPlan::Browser {
+                    url: link.url.to_string(),
+                    reason: "player situs ini butuh sesi browser (tidak bisa diambil yt-dlp)"
+                        .to_string(),
+                };
+            }
             if config.playback.embed_strategy == EmbedStrategy::Skip {
                 return PlaybackPlan::Refuse(
                     "Link embed dilewati sesuai config (embed_strategy = skip).".to_string(),
@@ -505,6 +522,33 @@ mod tests {
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
         path
+    }
+
+    #[test]
+    fn browser_only_embed_hosts_route_to_browser() {
+        let config = Config::default();
+        let tmp = tempfile::TempDir::new().unwrap();
+        let mpv = fake_binary(tmp.path(), "mpv");
+        let ytdlp = fake_binary(tmp.path(), "yt-dlp");
+        for host in [
+            "https://embed.settlar.io/embed/v1?t=abc",
+            "https://mkissa.to/anime/x/p-1-sub",
+        ] {
+            let mut stream = link(StreamKind::Embed);
+            stream.url = Url::parse(host).unwrap();
+            let plan = plan_playback(
+                &config,
+                &stream,
+                "Judul",
+                None,
+                Some(mpv.clone()),
+                Some(ytdlp.clone()),
+            );
+            assert!(
+                matches!(plan, PlaybackPlan::Browser { .. }),
+                "{host} harus ke browser: {plan:?}"
+            );
+        }
     }
 
     #[test]

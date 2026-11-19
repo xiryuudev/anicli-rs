@@ -7,7 +7,9 @@ use url::Url;
 use crate::config::{Config, SourceConfig};
 use crate::error::{SourceError, SourceResult};
 use crate::http::{HttpClient, MirrorSet};
-use crate::model::{AnimeDetail, AnimeSearchResult, Episode, SourceId};
+use crate::model::{
+    AnimeDetail, AnimeSearchResult, Episode, RequestHeaders, SourceId, StreamKind, StreamLink,
+};
 
 pub const NAME: &str = "anipm";
 pub const DEFAULT_BASE: &str = "https://ani.pm";
@@ -18,6 +20,7 @@ pub struct AniPm {
     source: SourceId,
     mirrors: MirrorSet,
     http: Arc<HttpClient>,
+    user_agent: String,
 }
 
 impl AniPm {
@@ -38,6 +41,7 @@ impl AniPm {
             source: SourceId::new(NAME),
             mirrors,
             http,
+            user_agent: config.http.user_agent.clone(),
         })
     }
 
@@ -66,6 +70,82 @@ impl AniPm {
 
     pub async fn episodes(&self, anime_url: &str) -> SourceResult<Vec<Episode>> {
         self.detail(anime_url).await.map(|detail| detail.episodes)
+    }
+
+    /// Pecah `/anime/<route>/episode-<n>` → (route, n).
+    fn split_episode(url: &Url) -> Option<(String, u32)> {
+        let segments: Vec<&str> = url.path_segments()?.collect();
+        let index = segments.iter().position(|segment| *segment == "anime")?;
+        let route = segments.get(index + 1)?.to_string();
+        let episode = segments
+            .get(index + 2)?
+            .strip_prefix("episode-")?
+            .parse::<u32>()
+            .ok()?;
+        Some((route, episode))
+    }
+
+    /// Stream ani.pm: API `playback-bootstrap` memberi token player `embed.settlar.io`.
+    ///
+    /// Token berlaku singkat, jadi diambil saat user menekan Enter (bukan saat
+    /// daftar episode dimuat).
+    pub async fn fetch_streams(&self, episode_url: &str) -> SourceResult<Vec<StreamLink>> {
+        let base = self.base_url().await?;
+        let page = Url::parse(episode_url).map_err(|err| {
+            SourceError::parse(NAME, "episode", "url", format!("URL tidak valid: {err}"))
+        })?;
+        let (route, episode) = Self::split_episode(&page).ok_or_else(|| {
+            SourceError::parse(NAME, "episode", "url", "URL episode tidak dikenali")
+        })?;
+
+        let mut links = Vec::new();
+        let bootstrap_path =
+            format!("/api/anime/playback-bootstrap/settlar/{route}?ep={episode}&lang=sub");
+        if let Ok(api) = base.join(&bootstrap_path) {
+            if let Ok(body) = self.http.get_text(NAME, &api, Some(&base)).await {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
+                    if let Some(selection) = json
+                        .get("settlarSelection")
+                        .and_then(|value| value.as_str())
+                        .filter(|value| !value.is_empty())
+                    {
+                        if let Ok(embed) =
+                            Url::parse(&format!("https://embed.settlar.io/embed/v1?t={selection}"))
+                        {
+                            links.push(StreamLink {
+                                source: self.source.clone(),
+                                resolution: None,
+                                label: format!("Settlar — Episode {episode}"),
+                                server: crate::embed::classify_server(&embed),
+                                container: None,
+                                url: embed,
+                                headers: RequestHeaders {
+                                    referer: Some(base.clone()),
+                                    user_agent: Some(self.user_agent.clone()),
+                                },
+                                stream_kind: StreamKind::Embed,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Selalu sediakan halaman tonton resmi sebagai cadangan (browser).
+        links.push(StreamLink {
+            source: self.source.clone(),
+            resolution: None,
+            label: format!("Browser — Episode {episode}"),
+            server: crate::embed::classify_server(&page),
+            container: None,
+            url: page,
+            headers: RequestHeaders {
+                referer: Some(base.clone()),
+                user_agent: Some(self.user_agent.clone()),
+            },
+            stream_kind: StreamKind::Embed,
+        });
+        Ok(links)
     }
 
     pub fn source_id(&self) -> &SourceId {

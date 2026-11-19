@@ -241,6 +241,8 @@ jobs:
           files: release/*
           fail_on_unmatched_files: true
           generate_release_notes: false
+          # Tag ber-sufiks (mis. v0.9.0-rc1) = pre-release untuk dites lokal.
+          prerelease: ${{ contains(github.ref_name, '-') }}
 
   msrv:
     name: msrv (1.88)

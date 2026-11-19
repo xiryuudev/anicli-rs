@@ -42,7 +42,7 @@ impl AnimeSource for AniPm {
             genres: true,
             detail: true,
             episodes: true,
-            streams: false,
+            streams: true,
             batch_download: false,
         }
     }
@@ -67,7 +67,7 @@ impl AnimeSource for AniPm {
         AniPm::episodes(self, anime_url).await
     }
 
-    async fn streams(&self, _episode_url: &str) -> SourceResult<Vec<StreamLink>> {
-        Err(SourceError::unsupported(NAME, "streams"))
+    async fn streams(&self, episode_url: &str) -> SourceResult<Vec<StreamLink>> {
+        AniPm::fetch_streams(self, episode_url).await
     }
 }

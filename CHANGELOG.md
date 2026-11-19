@@ -4,6 +4,23 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.9.0] - 2026-11-19
+
+### Ditambahkan
+
+- **Playback untuk source katalog**:
+  - **ani.pm**: ambil token player lewat `GET /api/anime/playback-bootstrap/settlar/<route>?ep=<n>`
+    (tanpa login) → link `embed.settlar.io`; plus halaman tonton resmi sebagai cadangan.
+  - **mkissa**: rute episode asli `/anime/<id>/p-<n>-sub` (sebelumnya `/episode-<n>`
+    yang 404) → membuka player resmi situs.
+- **Routing browser** untuk host yang player-nya tidak bisa diambil yt-dlp/mpv
+  (`settlar.io`, `mkissa.to`, `filelotion.fyi`): Enter pada episode membuka browser,
+  bukan gagal `exit 2`.
+- Skrip `scripts/verify-release.sh`: unduh aset rilis dari GitHub, cek SHA256, lalu
+  jalankan rantai penuh (search → detail → episode → stream) per source + cek registry.
+- Tag dengan sufiks (mis. `v0.9.0-rc1`) otomatis menjadi **pre-release** di CI,
+  sehingga bisa dites lokal sebelum rilis final.
+
 ## [0.8.2] - 2026-11-19
 
 ### Diperbaiki

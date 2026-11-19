@@ -41,8 +41,8 @@ impl AnimeSource for Mkissa {
             genres: false,
             detail: true,
             episodes: true,
-            // Endpoint `episode` memerlukan crypto klien (AA_CRYPTO_MISSING).
-            streams: false,
+            // Stream asli butuh signature `aaReq`; kita buka halaman tonton resmi.
+            streams: true,
             batch_download: false,
         }
     }
@@ -67,7 +67,7 @@ impl AnimeSource for Mkissa {
         Mkissa::episodes(self, anime_url).await
     }
 
-    async fn streams(&self, _episode_url: &str) -> SourceResult<Vec<StreamLink>> {
-        Err(SourceError::unsupported(NAME, "streams"))
+    async fn streams(&self, episode_url: &str) -> SourceResult<Vec<StreamLink>> {
+        Mkissa::fetch_streams(self, episode_url).await
     }
 }
