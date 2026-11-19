@@ -142,7 +142,7 @@ fn build_uses_factories_and_reports_missing_sources() {
     let build = SourceRegistry::build(&config, FACTORIES);
 
     assert_eq!(build.registry.names(), vec!["samehadaku"]);
-    assert_eq!(build.missing.len(), 6);
+    assert_eq!(build.missing.len(), 8);
     assert!(build
         .warnings
         .iter()
@@ -160,7 +160,9 @@ fn from_config_instantiates_builtin_sources() {
     assert_eq!(
         names,
         vec![
+            "anichin",
             "animeindo",
+            "anipm",
             "anoboy",
             "kotakanime",
             "kusonime",
@@ -171,4 +173,23 @@ fn from_config_instantiates_builtin_sources() {
     );
     assert!(build.missing.is_empty(), "missing: {:?}", build.missing);
     assert!(build.warnings.is_empty(), "warnings: {:?}", build.warnings);
+}
+
+#[test]
+fn registry_reports_unique_languages() {
+    let config = Config::default();
+    let build = SourceRegistry::from_config(&config);
+    let languages = build.registry.languages();
+    assert!(
+        languages.contains(&anicli_rs::model::Language::Indonesian),
+        "source ID harus ada: {languages:?}"
+    );
+    assert!(
+        languages.contains(&anicli_rs::model::Language::English),
+        "ani.pm harus terdaftar sebagai EN: {languages:?}"
+    );
+    // unik
+    let mut deduped = languages.clone();
+    deduped.dedup();
+    assert_eq!(deduped.len(), languages.len());
 }

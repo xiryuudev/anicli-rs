@@ -67,15 +67,24 @@ pub struct GeneralConfig {
     pub default_source: String,
     pub fallback_order: Vec<String>,
     pub language: String,
+    /// Filter bahasa source: `"all"`, `"id"`, `"en"`, atau `"jp"`.
+    #[serde(default = "default_language_filter")]
+    pub language_filter: String,
+
     /// Cakupan pencarian (bisa diubah dengan tombol `S` di layar Cari).
     #[serde(default)]
     pub search_scope: SearchScope,
+}
+
+fn default_language_filter() -> String {
+    "all".to_string()
 }
 
 impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
             search_scope: SearchScope::All,
+            language_filter: default_language_filter(),
             default_source: "samehadaku".to_string(),
             fallback_order: vec![
                 "samehadaku".to_string(),
@@ -84,6 +93,8 @@ impl Default for GeneralConfig {
                 "animeindo".to_string(),
                 "anoboy".to_string(),
                 "kotakanime".to_string(),
+                "anichin".to_string(),
+                "anipm".to_string(),
                 "kusonime".to_string(),
             ],
             language: "id".to_string(),
@@ -400,6 +411,22 @@ fn default_sources() -> BTreeMap<String, SourceConfig> {
         SourceConfig {
             enabled: true,
             base_url: "https://s13.nontonanimeid.boats".to_string(),
+            mirrors: Vec::new(),
+        },
+    );
+    sources.insert(
+        "anichin".to_string(),
+        SourceConfig {
+            enabled: true,
+            base_url: "https://z1.anichin.blog".to_string(),
+            mirrors: vec!["https://www.anichin.blog".to_string()],
+        },
+    );
+    sources.insert(
+        "anipm".to_string(),
+        SourceConfig {
+            enabled: true,
+            base_url: "https://ani.pm".to_string(),
             mirrors: Vec::new(),
         },
     );
@@ -928,7 +955,7 @@ mod tests {
     fn template_parses() {
         let parsed: Config = toml::from_str(CONFIG_TEMPLATE).expect("template harus valid TOML");
         assert_eq!(parsed.config_version, CURRENT_CONFIG_VERSION);
-        assert_eq!(parsed.sources.len(), 7);
+        assert_eq!(parsed.sources.len(), 9);
         assert!(parsed.sources.keys().any(|name| name == "otakudesu"));
     }
 

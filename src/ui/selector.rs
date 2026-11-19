@@ -4,10 +4,14 @@
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+use crate::model::Language;
+
 /// Satu baris di selector.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceEntry {
     pub name: String,
+    /// Bahasa konten source (untuk label `[ID]`/`[EN]`).
+    pub language: Language,
     /// Source punya factory & ikut dibangun registry.
     pub available: bool,
     /// Enabled di config saat ini.
@@ -130,6 +134,25 @@ impl SourceSelector {
     }
 }
 
+/// Pilihan bahasa untuk tab/filter Bahasa.
+///
+/// `None` berarti "semua bahasa".
+pub fn language_options() -> Vec<(Option<Language>, String)> {
+    let mut options = vec![(None, "Semua bahasa".to_string())];
+    for language in Language::ALL {
+        options.push((
+            Some(*language),
+            format!("{} {}", language.tag(), language.label()),
+        ));
+    }
+    options
+}
+
+/// Source entry dengan label bahasa, mis. `Anichin [ID]`.
+pub fn source_label(name: &str, language: Language) -> String {
+    format!("{name} {}", language.tag())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -142,16 +165,19 @@ mod tests {
         vec![
             SourceEntry {
                 name: "samehadaku".into(),
+                language: Language::Indonesian,
                 available: true,
                 enabled: true,
             },
             SourceEntry {
                 name: "otakudesu".into(),
+                language: Language::Indonesian,
                 available: true,
                 enabled: true,
             },
             SourceEntry {
                 name: "kusonime".into(),
+                language: Language::Indonesian,
                 available: true,
                 enabled: false,
             },

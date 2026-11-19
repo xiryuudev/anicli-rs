@@ -15,7 +15,12 @@ play — with automatic fallback between sources when one fails.
 
 - **TUI** built with `ratatui`/`crossterm`: Search, Browse, Detail, Episodes, Streams,
   History, Bookmarks, Logs, Settings, and Help screens.
-- **7 sources** with a shared trait (`AnimeSource`), so a new site is a small module.
+- **9 sources** with a shared trait (`AnimeSource`), so a new site is a small module.
+- **Language metadata + filter**: every source exposes a `Language` (`[ID]`, `[EN]`,
+  extensible). Press `Y` for the **Bahasa** popup (rolling selection) to filter both
+  the source list and search; the choice persists in
+  `[general] language_filter = "all" | "id" | "en" | "jp"`. Adding a source with a new
+  language needs no UI changes.
 - **Cross-source fallback** based on *identity* (title + episode number), not URLs:
   if a source fails, the app tries the next one from your fallback order.
 - **Streaming search**: results appear per source as soon as that source responds
@@ -55,6 +60,8 @@ play — with automatic fallback between sources when one fails.
 | Animeindo | Streaming | `a.server[data-video]` → xtwap → `googlevideo` MP4 |
 | Anoboy | Streaming | Blogger iframe → MP4; JS-only hosts are exposed as `Embed` |
 | KotakAnime | Streaming | HLS (480p/720p/1080p) via AJAX player + decoded embed page |
+| Anichin [ID] | Streaming | Donghua sub Indo; search, detail, episode list, player embed (`rmb.anichin.bio`) |
+| Ani.pm [EN] | Catalog | English; JSON API search + LD+JSON detail + 1…N episode URLs; SPA player not implemented |
 | Kusonime | Download | Batch page per series: 25–30 host links (360p–1080p, MKV/MP4); no streaming |
 
 Sources that are download-only, duplicate catalogs, or defunct (AWSubs, Doronime,
@@ -136,6 +143,7 @@ Data (history, bookmarks) and logs live next to it in the data directory
 | `r` | Pick resolution (highlight follows) |
 | `s` | Open source selector (type to filter, Enter to choose) |
 | `S` | Toggle search scope: all sources / active source only |
+| `Y` | Language filter popup (all / ID / EN / JP) — filters source list & search |
 | `l` | Browse (ongoing/completed) |
 | `H` | History |
 | `B` | Bookmarks |
@@ -264,7 +272,8 @@ be disabled with `[update] check_on_start = false`.
 1. Create `src/sources/<name>/` with `mod.rs`, `client.rs`, `parse.rs`.
 2. `parse.rs`: pure functions with tests that load fixtures from `tests/fixtures/`.
 3. `client.rs`: base URL, `MirrorSet` marker, HTTP calls, stream resolution.
-4. Implement `AnimeSource` and expose `NAME`, `build`, `factory`.
+4. Implement `AnimeSource`, override `language()` if not Indonesian, and expose
+   `NAME`, `build`, `factory`.
 5. Register the factory in `src/sources/mod.rs`.
 6. Add a `[sources.<name>]` block to `config.example.toml` and `Config::default()`.
 7. Verify with `cargo run --bin sourcecheck -- --source <name> --query "<title>"`.

@@ -4,6 +4,34 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.8.0] - 2026-11-19
+
+### Ditambahkan
+
+- **Anichin** (`z1.anichin.blog`) — source donghua sub Indo: pencarian `/?s=`,
+  listing ongoing/completed (`/series/?status=`), detail `/series/<slug>/`, daftar
+  episode (`div.eplister`), dan player embed `rmb.anichin.bio`.
+- **Ani.pm** (`ani.pm`) — source berbahasa **Inggris**: pencarian lewat JSON API
+  `/api/anime/search?q=`, detail dari LD+JSON `TVSeries`, daftar episode dibentuk dari
+  `numberOfEpisodes` (`/anime/<routeId>/episode-<n>`). Player SPA-nya belum
+  diimplementasikan → `streams = false` (jujur di capability).
+- **Metadata bahasa** pada trait: `AnimeSource::language()` dengan default
+  `Language::Indonesian`, enum `Language { Indonesian, English, Japanese }`
+  (extensible) + `Language::ALL`, `code()`, `tag()`, `label()`, `from_code()`.
+- **Tab/popup Bahasa** (tombol `Y`): rolling selection semua bahasa + "semua bahasa",
+  menampilkan jumlah source per bahasa. Pilihan memfilter daftar source (`s`) dan
+  urutan pencarian; tersimpan di `[general] language_filter`.
+- **Label bahasa** di daftar source: `[ID] samehadaku`, `[EN] anipm`, dst.
+- `SourceRegistry::languages()` untuk daftar bahasa unik.
+- Test: parser Anichin (fixture search/series/episode), parser Ani.pm (JSON search +
+  LD+JSON detail + 220 episode), filter bahasa (popup → EN → source aktif pindah &
+  order hanya EN), label bahasa, dan `registry.languages()`.
+
+### Diubah
+
+- Default config: 9 source (anichin, anipm ditambahkan), `language_filter = "all"`.
+- README: tabel source + bagian bahasa + keymap `Y`.
+
 ## [0.7.1] - 2026-11-16
 
 ### Diperbaiki

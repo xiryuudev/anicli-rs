@@ -179,6 +179,19 @@ fn sample_bookmark() -> BookmarkEntry {
     }
 }
 
+/// App dengan registry nyata (semua source implementasi, tanpa jaringan saat dibuat).
+fn real_app() -> App {
+    let config = Config::default();
+    let build = anicli_rs::sources::SourceRegistry::from_config(&config);
+    App::new(
+        config,
+        Arc::new(build.registry),
+        "samehadaku".to_string(),
+        paths(),
+        None,
+    )
+}
+
 fn render_text(app: &App, width: u16, height: u16) -> String {
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -368,6 +381,57 @@ async fn update_toast_shows_version_and_self_dismisses() {
     app.on_tick();
     assert_eq!(app.tick, 750);
     assert!(app.update_toast.is_none(), "toast harus hilang sendiri");
+}
+
+#[test]
+fn language_popup_filters_sources_and_switches_active() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = real_app();
+    app.input_focused = false;
+    app.screen = ui::Screen::Search;
+    assert_eq!(app.language_filter, None);
+
+    app.handle_input(key(KeyCode::Char('Y')), &tx);
+    assert!(app.language_popup);
+    let text = render_text(&app, 100, 30);
+    assert!(text.contains("Bahasa sumber"), "{text}");
+    assert!(text.contains("[EN]"), "{text}");
+
+    // Opsi: [semua, ID, EN, JP] → EN adalah indeks 2.
+    app.handle_input(key(KeyCode::Down), &tx);
+    app.handle_input(key(KeyCode::Down), &tx);
+    app.handle_input(key(KeyCode::Enter), &tx);
+    assert!(!app.language_popup);
+    assert_eq!(
+        app.language_filter,
+        Some(anicli_rs::model::Language::English)
+    );
+    // Source aktif harus pindah ke source EN pertama (ani.pm).
+    assert_eq!(app.source_name, "anipm");
+    // Order pencarian hanya berisi source EN.
+    let order = app.search_order();
+    assert!(!order.is_empty());
+    assert!(order.iter().all(|name| name == "anipm"), "{order:?}");
+
+    // Esc pada popup tidak mengubah filter.
+    app.handle_input(key(KeyCode::Char('Y')), &tx);
+    assert!(app.language_popup);
+    app.handle_input(key(KeyCode::Esc), &tx);
+    assert_eq!(
+        app.language_filter,
+        Some(anicli_rs::model::Language::English)
+    );
+}
+
+#[test]
+fn source_selector_labels_language() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = app();
+    app.input_focused = false;
+    app.screen = ui::Screen::Search;
+    app.handle_input(key(KeyCode::Char('s')), &tx);
+    let text = render_text(&app, 100, 30);
+    assert!(text.contains("[ID]"), "label bahasa hilang: {text}");
 }
 
 #[test]

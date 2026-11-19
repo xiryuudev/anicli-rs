@@ -33,7 +33,7 @@ default_source = "samehadaku"
 # Urutan fallback saat source utama gagal (error jaringan, diblokir, parser rusak,
 # stream kosong). Source pertama dicoba, lalu berikutnya. Nama yang tidak dikenal
 # akan diabaikan dengan peringatan di log.
-fallback_order = ["samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kotakanime", "kusonime"]
+fallback_order = ["samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kotakanime", "anichin", "anipm", "kusonime"]
 
 # Bahasa antarmuka. Saat ini hanya "id".
 language = "id"
@@ -181,6 +181,8 @@ to_stderr = false
 android_player = "auto"
 # "all" = cari di semua source aktif; "selected" = hanya source aktif.
 search_scope = "all"
+# Filter bahasa source: "all" | "id" | "en" | "jp" (bisa diubah dengan tombol Y).
+language_filter = "all"
 
 
 [sources.samehadaku]
@@ -218,6 +220,18 @@ mirrors = ["https://anoboy.nl"]
 enabled = true
 # Host s<N> berotasi; portal stabil: https://kotakanimeid.link
 base_url = "https://s13.nontonanimeid.boats"
+mirrors = []
+
+[sources.anichin]
+enabled = true
+# Donghua sub Indo (tema Madara).
+base_url = "https://z1.anichin.blog"
+mirrors = ["https://www.anichin.blog"]
+
+[sources.anipm]
+enabled = true
+# Source berbahasa Inggris: pencarian lewat JSON API, player SPA belum didukung.
+base_url = "https://ani.pm"
 mirrors = []
 
 [sources.kusonime]

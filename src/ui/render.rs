@@ -46,6 +46,69 @@ pub fn render(frame: &mut Frame, app: &App) {
     if app.selector.is_some() {
         render_source_selector(frame, app, area);
     }
+    if app.language_popup {
+        render_language_selector(frame, app, area);
+    }
+}
+
+/// Popup filter bahasa (tab Bahasa): rolling selection.
+fn render_language_selector(frame: &mut Frame, app: &App, area: Rect) {
+    let options = crate::ui::selector::language_options();
+    let width = 46.min(area.width.saturating_sub(4)).max(30);
+    let height = (options.len() as u16 + 4)
+        .min(area.height.saturating_sub(2))
+        .max(6);
+    let popup = Rect {
+        x: area.x + (area.width.saturating_sub(width)) / 2,
+        y: area.y + (area.height.saturating_sub(height)) / 2,
+        width,
+        height,
+    };
+    frame.render_widget(Clear, popup);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(theme::accent())
+        .title(" Bahasa sumber — Enter terapkan · Esc batal ");
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let items: Vec<ListItem<'_>> = options
+        .iter()
+        .map(|(language, label)| {
+            let marker = match (language, app.language_filter) {
+                (None, None) => "●",
+                (Some(option), Some(active)) if *option == active => "●",
+                _ => "○",
+            };
+            let style = if marker == "●" {
+                theme::success()
+            } else {
+                theme::base()
+            };
+            let count = match language {
+                Some(language) => app
+                    .registry
+                    .sources()
+                    .iter()
+                    .filter(|source| source.language() == *language)
+                    .count(),
+                None => app.registry.sources().len(),
+            };
+            ListItem::new(Line::from(vec![
+                Span::styled(format!(" {marker} "), style),
+                Span::styled(label.clone(), style),
+                Span::styled(format!("  ({count} source)"), theme::dim()),
+            ]))
+        })
+        .collect();
+    let list = List::new(items)
+        .highlight_style(theme::highlight())
+        .highlight_symbol("▶ ");
+    frame.render_stateful_widget(
+        list,
+        inner,
+        &mut ratatui::widgets::ListState::default().with_selected(Some(app.language_index)),
+    );
 }
 
 /// Popup pemilih source: filter + daftar source + status.
@@ -113,6 +176,8 @@ fn render_source_selector(frame: &mut Frame, app: &App, area: Rect) {
             };
             ListItem::new(Line::from(vec![
                 Span::styled(format!(" {marker} "), style),
+                Span::styled(entry.language.tag().to_string(), theme::accent()),
+                Span::raw(" "),
                 Span::styled(entry.name.clone(), style),
                 Span::styled(note, theme::dim()),
             ]))
@@ -140,6 +205,7 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled(format!("v{}", crate::VERSION), theme::dim()),
         Span::raw("  ·  "),
         Span::styled(app.source_name.clone(), theme::accent()),
+        Span::styled(format!(" {}", app.language_label()), theme::dim()),
         Span::styled(loading, theme::warning()),
     ]);
     let block = Block::default()
@@ -651,6 +717,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         Line::from("  j k / ↑ ↓      navigasi daftar"),
         Line::from("  s              buka pemilih source (filter + Enter)"),
         Line::from("  S              cakupan cari: semua source / source aktif"),
+        Line::from("  Y              filter bahasa source (ID/EN/JP/semua)"),
         Line::from("  Esc            kembali / lepas fokus"),
         Line::from("  q              keluar (saat tidak mengetik)"),
         Line::from("  Ctrl+C         keluar kapan saja"),

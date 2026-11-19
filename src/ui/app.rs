@@ -23,8 +23,8 @@ use crate::fallback::{Attempt, PlaybackService};
 use crate::history::{History, HistoryEntry};
 use crate::logging::LogBuffer;
 use crate::model::{
-    AiringStatus, AnimeDetail, AnimeSearchResult, Episode, PlaybackTarget, Resolution, StreamKind,
-    StreamLink,
+    AiringStatus, AnimeDetail, AnimeSearchResult, Episode, Language, PlaybackTarget, Resolution,
+    StreamKind, StreamLink,
 };
 use crate::paths::Paths;
 use crate::player::{self, PlaybackPlan};
@@ -180,6 +180,12 @@ pub struct App {
     pub search_slots: Vec<Option<Vec<AnimeSearchResult>>>,
     pub search_cancel: Option<tokio::task::AbortHandle>,
     pub selector: Option<SourceSelector>,
+    /// Filter bahasa aktif (`None` = semua).
+    pub language_filter: Option<Language>,
+    /// Indeks pilihan di popup bahasa.
+    pub language_index: usize,
+    /// Popup bahasa sedang terbuka.
+    pub language_popup: bool,
     /// Toast update yang sedang tampil (versi lebih baru).
     pub update_toast: Option<String>,
     pub update_version: Option<String>,
@@ -212,6 +218,7 @@ pub struct App {
     pub log_index: usize,
     pub settings_index: usize,
     pub data_dir: PathBuf,
+    pub config_file: PathBuf,
     pub job: u64,
     pub quit: bool,
     pub tick: u64,
@@ -228,6 +235,8 @@ impl App {
     ) -> Self {
         let service = PlaybackService::new(registry.clone(), &config);
         let search_scope = config.general.search_scope;
+        let language_filter = Language::from_code(&config.general.language_filter);
+        let config_file = paths.config_file.clone();
         let data_dir = if config.storage.data_dir.trim().is_empty() {
             paths.data_dir.clone()
         } else {
@@ -248,6 +257,9 @@ impl App {
             search_slots: Vec::new(),
             search_cancel: None,
             selector: None,
+            language_filter,
+            language_index: 0,
+            language_popup: false,
             update_toast: None,
             update_version: None,
             status: format!("source: {source_name}"),
@@ -279,6 +291,7 @@ impl App {
             log_index: 0,
             settings_index: 0,
             data_dir,
+            config_file,
             job: 0,
             quit: false,
             tick: 0,
@@ -312,6 +325,8 @@ impl App {
         } else if !self.source_name.is_empty() {
             order.insert(0, self.source_name.clone());
         }
+        // Filter bahasa (tab Bahasa / config): hanya source yang cocok.
+        order.retain(|name| self.source_matches_language(name));
         order
     }
 
@@ -376,24 +391,115 @@ impl App {
         });
     }
 
+    /// Buka popup filter bahasa (tombol `Y`).
+    pub fn open_language_popup(&mut self) {
+        let options = crate::ui::selector::language_options();
+        self.language_index = options
+            .iter()
+            .position(|(language, _)| *language == self.language_filter)
+            .unwrap_or(0);
+        self.language_popup = true;
+        self.status = "filter bahasa: ↑/↓ pilih · Enter terapkan · Esc batal".to_string();
+    }
+
+    fn handle_language_key(&mut self, key: KeyEvent) {
+        let options = crate::ui::selector::language_options();
+        match key.code {
+            KeyCode::Esc => {
+                self.language_popup = false;
+                self.status = format!("filter bahasa: {}", self.language_label());
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.language_index = self.language_index.saturating_sub(1);
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if self.language_index + 1 < options.len() {
+                    self.language_index += 1;
+                }
+            }
+            KeyCode::Enter => {
+                if let Some((language, _)) = options.get(self.language_index) {
+                    self.language_filter = *language;
+                    self.language_popup = false;
+                    self.config.general.language_filter = language
+                        .map(|language| language.code().to_string())
+                        .unwrap_or_else(|| "all".to_string());
+                    let _ = self.config.save(&self.config_file());
+                    // Pastikan source aktif masih cocok dengan filter.
+                    if !self.source_matches_language(&self.source_name) {
+                        if let Some(first) = self.sources_for_language().first().cloned() {
+                            self.select_source(&first);
+                        }
+                    }
+                }
+                self.status = format!("filter bahasa: {}", self.language_label());
+            }
+            _ => {}
+        }
+    }
+
+    fn config_file(&self) -> std::path::PathBuf {
+        self.config_file.clone()
+    }
+
+    /// Label filter bahasa untuk UI.
+    pub fn language_label(&self) -> String {
+        match self.language_filter {
+            Some(language) => format!("{} {}", language.tag(), language.label()),
+            None => "semua bahasa".to_string(),
+        }
+    }
+
+    fn source_matches_language(&self, name: &str) -> bool {
+        let Some(source) = self.registry.get(name) else {
+            return false;
+        };
+        self.language_filter
+            .map(|language| source.language() == language)
+            .unwrap_or(true)
+    }
+
+    /// Nama source terpasang yang cocok dengan filter bahasa (urut registry).
+    pub fn sources_for_language(&self) -> Vec<String> {
+        self.registry
+            .names()
+            .into_iter()
+            .filter(|name| self.source_matches_language(name))
+            .map(ToString::to_string)
+            .collect()
+    }
+
     /// Buka popup pemilih source (tombol `s`).
     pub fn open_source_selector(&mut self) {
         let mut entries: Vec<SourceEntry> = Vec::new();
+        let language_of = |name: &str| {
+            self.registry
+                .get(name)
+                .map(|source| source.language())
+                .unwrap_or(Language::Indonesian)
+        };
         for (name, source_config) in &self.config.sources {
+            if !self.source_matches_language(name) {
+                continue;
+            }
             entries.push(SourceEntry {
                 name: name.clone(),
+                language: language_of(name),
                 available: self.registry.get(name).is_some(),
                 enabled: source_config.enabled,
             });
         }
         for name in self.registry.names() {
-            if !entries.iter().any(|entry| entry.name == name) {
-                entries.push(SourceEntry {
-                    name: name.to_string(),
-                    available: true,
-                    enabled: true,
-                });
+            if entries.iter().any(|entry| entry.name == name) || !self.source_matches_language(name)
+            {
+                continue;
             }
+            entries.push(SourceEntry {
+                name: name.to_string(),
+                language: language_of(name),
+                available: true,
+                enabled: true,
+            });
         }
         entries.sort_by(|a, b| a.name.cmp(&b.name));
         let count = entries.len();
@@ -462,6 +568,12 @@ impl App {
             return;
         }
 
+        // Popup bahasa menangkap input selama terbuka.
+        if self.language_popup {
+            self.handle_language_key(key);
+            return;
+        }
+
         // Popup source selector menangkap semua input selama terbuka.
         if self.selector.is_some() {
             let action = self
@@ -491,6 +603,10 @@ impl App {
             }
             KeyCode::Char('?') if !self.is_typing() => {
                 self.toggle_help();
+                return;
+            }
+            KeyCode::Char('Y') if !self.is_typing() => {
+                self.open_language_popup();
                 return;
             }
             KeyCode::Char('s') if !self.is_typing() && key.modifiers.is_empty() => {

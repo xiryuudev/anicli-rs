@@ -11,6 +11,78 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 // =============================================================================
+// Language
+// =============================================================================
+
+/// Bahasa konten sebuah source.
+///
+/// Sengaja `Copy` + `Eq` + `Hash` supaya bisa jadi key filter UI dan disimpan di
+/// config. Menambah bahasa baru cukup menambah varian di sini — tidak ada kode tab
+/// yang perlu diubah.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Language {
+    /// Subtitle Indonesia (mayoritas source).
+    #[serde(rename = "id")]
+    Indonesian,
+    /// English sub/dub.
+    #[serde(rename = "en")]
+    English,
+    /// Japanese (placeholder untuk membuktikan extensibility).
+    #[serde(rename = "jp")]
+    Japanese,
+}
+
+impl Language {
+    /// Semua bahasa yang dikenal, urut untuk tampilan.
+    pub const ALL: &'static [Language] =
+        &[Language::Indonesian, Language::English, Language::Japanese];
+
+    /// Kode pendek stabil (`id`, `en`, `jp`) untuk config/log.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Indonesian => "id",
+            Self::English => "en",
+            Self::Japanese => "jp",
+        }
+    }
+
+    /// Tag pendek untuk label UI, mis. `[ID]`.
+    pub fn tag(self) -> &'static str {
+        match self {
+            Self::Indonesian => "[ID]",
+            Self::English => "[EN]",
+            Self::Japanese => "[JP]",
+        }
+    }
+
+    /// Nama panjang untuk tab Bahasa.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Indonesian => "Indonesia",
+            Self::English => "English",
+            Self::Japanese => "Japanese",
+        }
+    }
+
+    /// Parse dari kode (`id`/`id-ID`/`indonesian`), case-insensitive.
+    pub fn from_code(raw: &str) -> Option<Self> {
+        let value = raw.trim().to_ascii_lowercase();
+        match value.as_str() {
+            "id" | "id-id" | "indonesian" | "indonesia" | "indo" => Some(Self::Indonesian),
+            "en" | "en-us" | "english" | "eng" => Some(Self::English),
+            "jp" | "ja" | "japanese" | "jpn" => Some(Self::Japanese),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Language {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.label())
+    }
+}
+
+// =============================================================================
 // Resolution
 // =============================================================================
 
