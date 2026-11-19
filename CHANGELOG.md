@@ -16,6 +16,8 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 - **Routing browser** untuk host yang player-nya tidak bisa diambil yt-dlp/mpv
   (`settlar.io`, `mkissa.to`, `filelotion.fyi`): Enter pada episode membuka browser,
   bukan gagal `exit 2`.
+- **Anichin**: halaman hasil kosong ("Tidak ditemukan") diperlakukan sebagai daftar
+  kosong, bukan error parser (ditemukan saat uji lokal binary pre-release CI).
 - Skrip `scripts/verify-release.sh`: unduh aset rilis dari GitHub, cek SHA256, lalu
   jalankan rantai penuh (search → detail → episode → stream) per source + cek registry.
 - Tag dengan sufiks (mis. `v0.9.0-rc1`) otomatis menjadi **pre-release** di CI,
