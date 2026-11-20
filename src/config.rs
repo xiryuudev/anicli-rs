@@ -139,6 +139,8 @@ impl Default for GeneralConfig {
                 "anichin".to_string(),
                 "anipm".to_string(),
                 "mkissa".to_string(),
+                "animotvslash".to_string(),
+                "kuramanime".to_string(),
                 "kusonime".to_string(),
             ],
             language: "id".to_string(),
@@ -462,8 +464,11 @@ fn default_sources() -> BTreeMap<String, SourceConfig> {
         "anichin".to_string(),
         SourceConfig {
             enabled: true,
-            base_url: "https://z1.anichin.blog".to_string(),
-            mirrors: vec!["https://www.anichin.blog".to_string()],
+            base_url: "https://anichin.moe".to_string(),
+            mirrors: vec![
+                "https://www.anichin.moe".to_string(),
+                "https://anichin.care".to_string(),
+            ],
         },
     );
     sources.insert(
@@ -479,6 +484,22 @@ fn default_sources() -> BTreeMap<String, SourceConfig> {
         SourceConfig {
             enabled: true,
             base_url: "https://mkissa.to".to_string(),
+            mirrors: Vec::new(),
+        },
+    );
+    sources.insert(
+        "animotvslash".to_string(),
+        SourceConfig {
+            enabled: true,
+            base_url: "https://animotvslash.org".to_string(),
+            mirrors: Vec::new(),
+        },
+    );
+    sources.insert(
+        "kuramanime".to_string(),
+        SourceConfig {
+            enabled: true,
+            base_url: "https://v20.kuramanime.ing".to_string(),
             mirrors: Vec::new(),
         },
     );
@@ -1015,7 +1036,7 @@ mod tests {
     fn template_parses() {
         let parsed: Config = toml::from_str(CONFIG_TEMPLATE).expect("template harus valid TOML");
         assert_eq!(parsed.config_version, CURRENT_CONFIG_VERSION);
-        assert_eq!(parsed.sources.len(), 10);
+        assert_eq!(parsed.sources.len(), 12);
         assert!(parsed.sources.keys().any(|name| name == "otakudesu"));
     }
 

@@ -4,6 +4,36 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.10.0] - 2026-11-20
+
+### Diperbaiki
+
+- **Anichin dipindah ke domain resmi**: `z1.anichin.blog` adalah situs **palsu**
+  (situs asli menegaskan hanya `anichin.moe`, dengan `anichin.care` sebagai direct).
+  Default config kini `https://anichin.moe` + mirror `www.anichin.moe`, `anichin.care`,
+  dan listing memakai `/anime` (bukan `/series`). Mirror player di halaman episode
+  disimpan sebagai **base64** di `<select.mirror>`; sekarang didekode sehingga stream
+  (mis. `player.nunadrama.sbs`, OK.ru) benar-benar terambil.
+
+### Ditambahkan
+
+- **Animotvslash** (`animotvslash.org`, English) — tema Madara: pencarian `/?s=`,
+  detail `/anime/<slug>/`, daftar episode dari link `*-episode-<n>`, player iframe
+  `*.p2pplay.pro`. Diuji live 5 judul (naruto/one piece/bleach/attack on titan/
+  jujutsu kaisen): semuanya search + episode + stream.
+- **Kuramanime** (`v20.kuramanime.ing`, Indonesia) — pencarian `/anime?search=`,
+  kartu `div.product__item`, detail dengan sinopsis (`#synopsisField`), genre, poster;
+  jumlah episode dari `/properties/episodes/<n>` dan daftar episode dibentuk dari pola
+  `/anime/<id>/<slug>/episode/<n>`. Player butuh parameter bertanda tangan + JS →
+  dibuka di browser bersama pemilih server resmi.
+
+### Catatan
+
+- Kuramanime tidak mempublikasikan jumlah episode untuk serial **ongoing** panjang
+  (mis. One Piece menampilkan `?`); untuk judul seperti itu daftar episode kosong dan
+  pemutaran harus lewat situs. Judul dengan jumlah episode diketahui (mis. Boruto 293,
+  Jujutsu Kaisen 24) tampil normal.
+
 ## [0.9.3] - 2026-11-20
 
 ### Diperbaiki

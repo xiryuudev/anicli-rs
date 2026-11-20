@@ -142,7 +142,7 @@ fn build_uses_factories_and_reports_missing_sources() {
     let build = SourceRegistry::build(&config, FACTORIES);
 
     assert_eq!(build.registry.names(), vec!["samehadaku"]);
-    assert_eq!(build.missing.len(), 9);
+    assert_eq!(build.missing.len(), 11);
     assert!(build
         .warnings
         .iter()
@@ -162,9 +162,11 @@ fn from_config_instantiates_builtin_sources() {
         vec![
             "anichin",
             "animeindo",
+            "animotvslash",
             "anipm",
             "anoboy",
             "kotakanime",
+            "kuramanime",
             "kusonime",
             "mkissa",
             "oploverz",

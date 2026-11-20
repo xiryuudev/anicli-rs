@@ -15,7 +15,7 @@ play — with automatic fallback between sources when one fails.
 
 - **TUI** built with `ratatui`/`crossterm`: Search, Browse, Detail, Episodes, Streams,
   History, Bookmarks, Logs, Settings, and Help screens.
-- **10 sources** with a shared trait (`AnimeSource`), so a new site is a small module.
+- **12 sources** with a shared trait (`AnimeSource`), so a new site is a small module.
 - **Language metadata + filter**: every source exposes a `Language` (`[ID]`, `[EN]`,
   extensible). Press `Y` for the **Bahasa** popup (rolling selection) to filter both
   the source list and search; the choice persists in
@@ -60,7 +60,9 @@ play — with automatic fallback between sources when one fails.
 | Animeindo | Streaming | `a.server[data-video]` → xtwap → `googlevideo` MP4 |
 | Anoboy | Streaming | Blogger iframe → MP4; JS-only hosts are exposed as `Embed` |
 | KotakAnime | Streaming | HLS (480p/720p/1080p) via AJAX player + decoded embed page |
-| Anichin [ID] | Streaming | Donghua sub Indo; search, detail, episode list, player embed (`rmb.anichin.bio`) |
+| Anichin [ID] | Streaming | Official **anichin.moe** (anichin.care = direct); donghua sub Indo; search/detail/episodes, mirrors decoded from base64 |
+| Animotvslash [EN] | Streaming | Madara theme; search, detail, episode list, iframe player (`*.p2pplay.pro`) |
+| Kuramanime [ID] | Streaming | Sub Indo; search, detail, episodes from real count; player opens in browser (signed params) |
 | Ani.pm [EN] | Catalog | English; JSON API search + LD+JSON detail + 1…N episode URLs; SPA player not implemented |
 | Mkissa [EN] | Catalog | English; GraphQL (`api.mkissa.net`) search/detail/episode list; stream endpoint needs client crypto |
 | Kusonime | Download | Batch page per series: 25–30 host links (360p–1080p, MKV/MP4); no streaming |

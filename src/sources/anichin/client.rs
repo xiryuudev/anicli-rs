@@ -12,8 +12,8 @@ use crate::model::{
 };
 
 pub const NAME: &str = "anichin";
-pub const DEFAULT_BASE: &str = "https://z1.anichin.blog";
-pub const MARKER: &str = "anichin";
+pub const DEFAULT_BASE: &str = "https://anichin.moe";
+pub const MARKER: &str = "anichin.moe";
 
 #[derive(Debug)]
 pub struct Anichin {
@@ -70,7 +70,7 @@ impl Anichin {
 
     async fn browse(&self, status: &str) -> SourceResult<Vec<AnimeSearchResult>> {
         let base = self.base_url().await?;
-        let mut url = Self::join(&base, "/series/")?;
+        let mut url = Self::join(&base, "/anime")?;
         url.query_pairs_mut().append_pair("status", status);
         let body = self.http.get_text(NAME, &url, Some(&base)).await?;
         super::parse::parse_list(&body, &base, &self.source)

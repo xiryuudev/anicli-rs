@@ -33,7 +33,7 @@ default_source = "samehadaku"
 # Urutan fallback saat source utama gagal (error jaringan, diblokir, parser rusak,
 # stream kosong). Source pertama dicoba, lalu berikutnya. Nama yang tidak dikenal
 # akan diabaikan dengan peringatan di log.
-fallback_order = ["samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kotakanime", "anichin", "anipm", "mkissa", "kusonime"]
+fallback_order = ["samehadaku", "otakudesu", "oploverz", "animeindo", "anoboy", "kotakanime", "anichin", "anipm", "mkissa", "animotvslash", "kuramanime", "kusonime"]
 
 # Bahasa antarmuka. Saat ini hanya "id".
 language = "id"
@@ -224,9 +224,9 @@ mirrors = []
 
 [sources.anichin]
 enabled = true
-# Donghua sub Indo (tema Madara).
-base_url = "https://z1.anichin.blog"
-mirrors = ["https://www.anichin.blog"]
+# Donghua sub Indo (tema Madara). Domain resmi: anichin.moe (anichin.care = direct).
+base_url = "https://anichin.moe"
+mirrors = ["https://www.anichin.moe", "https://anichin.care"]
 
 [sources.anipm]
 enabled = true
@@ -238,6 +238,18 @@ mirrors = []
 enabled = true
 # Source English (GraphQL api.mkissa.net): search + daftar episode; stream butuh crypto.
 base_url = "https://mkissa.to"
+mirrors = []
+
+[sources.animotvslash]
+enabled = true
+# English, tema Madara. Stream = iframe p2pplay (browser).
+base_url = "https://animotvslash.org"
+mirrors = []
+
+[sources.kuramanime]
+enabled = true
+# Indonesia sub Indo; player butuh parameter bertanda tangan (buka di browser).
+base_url = "https://v20.kuramanime.ing"
 mirrors = []
 
 [sources.kusonime]

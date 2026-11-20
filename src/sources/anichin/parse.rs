@@ -26,7 +26,10 @@ pub fn parse_list(
     let document = Html::parse_document(html_text);
     let mut results = Vec::new();
 
-    for card in select(&document, "div.bsx a.tip[href]") {
+    for card in select(
+        &document,
+        "div.bsx a.tip[href], article.bs div.bsx a.tip[href]",
+    ) {
         let Some(href) = attr(&card, "href") else {
             continue;
         };
@@ -87,6 +90,8 @@ pub fn parse_detail(html_text: &str, base: &Url, source: &SourceId) -> SourceRes
     let document = Html::parse_document(html_text);
 
     let title = select_first(&document, "h1.entry-title")
+        .or_else(|| select_first(&document, "h1"))
+        .or_else(|| select_first(&document, "div.infox h1"))
         .map(|element| text(&element))
         .filter(|value| !value.is_empty())
         .ok_or_else(|| {
@@ -167,6 +172,8 @@ pub fn parse_episode(
 ) -> SourceResult<(String, Option<Url>)> {
     let document = Html::parse_document(html_text);
     let title = select_first(&document, "h1.entry-title")
+        .or_else(|| select_first(&document, "h1"))
+        .or_else(|| select_first(&document, "div.infox h1"))
         .map(|element| text(&element))
         .filter(|value| !value.is_empty())
         .ok_or_else(|| {
@@ -178,10 +185,44 @@ pub fn parse_episode(
             )
         })?;
 
-    let iframe = select_first(&document, "iframe[src]")
+    Ok((title, player_url(&document, base)))
+}
+
+/// Ambil URL player dari halaman episode.
+///
+/// Tema Anichin menyimpan mirror di `<select.mirror>` sebagai **base64** berisi
+/// potongan HTML `<iframe src="…">`, beberapa episode juga punya iframe langsung.
+fn player_url(document: &Html, base: &Url) -> Option<Url> {
+    use base64::Engine as _;
+
+    if let Some(src) = select_first(document, "iframe[src]")
         .and_then(|frame| attr(&frame, "src"))
-        .and_then(|src| abs_url(base, &src));
-    Ok((title, iframe))
+        .and_then(|src| abs_url(base, &src))
+    {
+        return Some(src);
+    }
+    for option in &select(document, "select.mirror option[value]") {
+        let Some(encoded) = attr(option, "value") else {
+            continue;
+        };
+        if encoded.trim().is_empty() {
+            continue;
+        }
+        let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(encoded.trim()) else {
+            continue;
+        };
+        let Ok(fragment) = String::from_utf8(decoded) else {
+            continue;
+        };
+        let inner = Html::parse_fragment(&fragment);
+        if let Some(src) = select_first(&inner, "iframe[src]")
+            .and_then(|frame| attr(&frame, "src"))
+            .and_then(|src| abs_url(base, &src))
+        {
+            return Some(src);
+        }
+    }
+    None
 }
 
 #[cfg(test)]

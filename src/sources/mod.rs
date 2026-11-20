@@ -16,9 +16,11 @@ use crate::model::{AnimeDetail, AnimeSearchResult, Episode, Language, StreamLink
 
 pub mod anichin;
 pub mod animeindo;
+pub mod animotvslash;
 pub mod anipm;
 pub mod anoboy;
 pub mod kotakanime;
+pub mod kuramanime;
 pub mod kusonime;
 pub mod mkissa;
 pub mod mock;
@@ -135,6 +137,14 @@ pub fn factories() -> &'static [SourceFactory] {
         SourceFactory {
             name: anichin::NAME,
             build: anichin::build,
+        },
+        SourceFactory {
+            name: animotvslash::NAME,
+            build: animotvslash::build,
+        },
+        SourceFactory {
+            name: kuramanime::NAME,
+            build: kuramanime::build,
         },
         SourceFactory {
             name: anipm::NAME,
@@ -382,7 +392,7 @@ mod tests {
         let config = Config::default();
         let build = SourceRegistry::build(&config, &[]);
         assert!(build.registry.is_empty());
-        assert_eq!(build.missing.len(), 10);
+        assert_eq!(build.missing.len(), 12);
         assert!(build
             .warnings
             .iter()
@@ -406,7 +416,7 @@ mod tests {
         let build = SourceRegistry::build(&config, FACTORIES);
         assert_eq!(build.registry.len(), 1);
         assert_eq!(build.registry.names(), vec!["samehadaku"]);
-        assert_eq!(build.missing.len(), 9);
+        assert_eq!(build.missing.len(), 11);
     }
 
     #[test]
@@ -415,7 +425,7 @@ mod tests {
         config.sources.get_mut("samehadaku").unwrap().enabled = false;
         let build = SourceRegistry::build(&config, &[]);
         assert!(!build.missing.contains(&"samehadaku".to_string()));
-        assert_eq!(build.missing.len(), 9);
+        assert_eq!(build.missing.len(), 11);
     }
 
     #[tokio::test]
