@@ -28,6 +28,9 @@ struct RawSearch {
 struct RawItem {
     #[serde(default)]
     title: String,
+    /// Provider asal (`settlar`, `anilist`, …) — menentukan prefix path & bootstrap.
+    #[serde(default)]
+    source: String,
     #[serde(rename = "routeId", default)]
     route_id: String,
     #[serde(default)]
@@ -59,7 +62,11 @@ pub fn parse_search(
         if item.title.is_empty() || item.route_id.is_empty() {
             continue;
         }
-        let Some(url) = base.join(&format!("/anime/{}", item.route_id)).ok() else {
+        // Provider `anilist` hanya dilayani di `/ani/…`, `settlar` di `/anime/…`.
+        let Some(url) = base
+            .join(&format!("{}{}", path_prefix(&item.source), item.route_id))
+            .ok()
+        else {
             continue;
         };
         let thumbnail = item
@@ -161,9 +168,10 @@ pub fn parse_detail(
         .iter()
         .filter_map(|episode| {
             let number = episode.number.map(|value| value as u32)?;
+            let prefix = path_prefix(provider_from_path(page_url));
             let url = base
                 .join(&format!(
-                    "/anime/{}/episode-{number}",
+                    "{prefix}{}/episode-{number}",
                     route_id(page_url).unwrap_or_default()
                 ))
                 .ok()?;
@@ -202,17 +210,47 @@ pub fn parse_detail(
     })
 }
 
+/// Prefix path untuk provider (`anilist` → `/ani/`, lainnya `/anime/`).
+pub fn path_prefix(provider: &str) -> &'static str {
+    if provider.eq_ignore_ascii_case("anilist") {
+        "/ani/"
+    } else {
+        "/anime/"
+    }
+}
+
+/// Provider dari prefix path (`/ani/…` → anilist, `/anime/…` → settlar).
+pub fn provider_from_path(url: &Url) -> &'static str {
+    match url.path_segments().and_then(|mut segments| segments.next()) {
+        Some("ani") => "anilist",
+        _ => "settlar",
+    }
+}
+
+/// Provider yang dicoba berurutan saat bootstrap (yang pertama paling mungkin benar).
+pub fn provider_candidates(preferred: &str) -> Vec<&'static str> {
+    if preferred.eq_ignore_ascii_case("anilist") {
+        vec!["anilist", "settlar"]
+    } else {
+        vec!["settlar", "anilist"]
+    }
+}
+
 /// `/anime/<routeId>[/episode-N]` → `routeId`.
 pub fn route_id(url: &Url) -> Option<String> {
     let segments: Vec<&str> = url.path_segments()?.collect();
-    let index = segments.iter().position(|segment| *segment == "anime")?;
+    let index = segments
+        .iter()
+        .position(|segment| *segment == "anime" || *segment == "ani")?;
     segments.get(index + 1).map(|slug| (*slug).to_string())
 }
 
 /// `/anime/<routeId>/episode-<n>` → `<n>`.
 pub fn episode_number(url: &Url) -> Option<u32> {
     let segments: Vec<&str> = url.path_segments()?.collect();
-    let index = segments.iter().position(|segment| *segment == "anime")?;
+    let index = segments
+        .iter()
+        .position(|segment| *segment == "anime" || *segment == "ani")?;
     segments
         .get(index + 2)?
         .strip_prefix("episode-")?
@@ -286,6 +324,53 @@ mod tests {
         assert_eq!(detail.title, "Evangelion: 2.0 You Can (Not) Advance");
         assert_eq!(detail.kind, Some(MediaKind::Movie));
         assert_eq!(detail.episodes.len(), 1);
+    }
+
+    #[test]
+    fn anilist_search_uses_ani_prefix_and_detail_works() {
+        let items = parse_search(
+            &fixture("anipm/search_anilist.json"),
+            &base(),
+            &SourceId::new(NAME),
+        )
+        .unwrap();
+        assert_eq!(items.len(), 1);
+        // Provider `anilist` → path `/ani/`, bukan `/anime/`.
+        assert!(
+            items[0].url.as_str().contains("/ani/the-laid-off"),
+            "{}",
+            items[0].url
+        );
+
+        let page = items[0].url.clone();
+        let detail = parse_detail(
+            &fixture("anipm/bootstrap_anilist.json"),
+            &page,
+            &base(),
+            &SourceId::new(NAME),
+        )
+        .unwrap();
+        assert!(detail.title.to_lowercase().contains("laid-off"));
+        assert_eq!(detail.episodes.len(), 7);
+        // Episode mengikuti prefix halaman (`/ani/...`).
+        assert!(
+            detail.episodes[0].url.as_str().contains("/ani/"),
+            "{}",
+            detail.episodes[0].url
+        );
+    }
+
+    #[test]
+    fn provider_maps_to_path_prefix() {
+        assert_eq!(path_prefix("anilist"), "/ani/");
+        assert_eq!(path_prefix("settlar"), "/anime/");
+        assert_eq!(path_prefix(""), "/anime/");
+        let ani = base().join("/ani/x-1-abc").unwrap();
+        let anime = base().join("/anime/x-1-abc").unwrap();
+        assert_eq!(provider_from_path(&ani), "anilist");
+        assert_eq!(provider_from_path(&anime), "settlar");
+        assert_eq!(provider_candidates("anilist")[0], "anilist");
+        assert_eq!(provider_candidates("settlar")[0], "settlar");
     }
 
     #[test]

@@ -1,0 +1,56 @@
+{
+ "items": [
+  {
+   "id": 1207329,
+   "source": "anilist",
+   "slug": null,
+   "title": "The Laid-Off Cheat-Granting Mage Enjoys a Second Lease on Life",
+   "native": "\u8ffd\u653e\u3055\u308c\u305f\u30c1\u30fc\u30c8\u4ed8\u4e0e\u9b54\u8853\u5e2b\u306f\u6c17\u307e\u307e\u306a\u30bb\u30ab\u30f3\u30c9\u30e9\u30a4\u30d5\u3092\u8b33\u6b4c\u3059\u308b\u3002 \uff5e\u4ffa\u306f\u6b66\u5668\u3060\u3051\u3058\u3083\u306a\u304f\u3001\u3042\u3089\u3086\u308b\u3082\u306e\u306b\u300e\u5f37\u5316\u30dd\u30a4\u30f3\u30c8\u300f\u3092\u4ed8\u4e0e\u3067\u304d\u308b\u3057\u3001\u4ffa\u306e\u610f\u601d\u3067\u3044\u3064\u3067\u3082\u52b9\u679c\u3092\u89e3\u9664\u3067\u304d\u308b\u3051\u3069\u3001\u6b8b\u3063\u305f\u4eba\u305f\u3061\u5927\u4e08\u592b\uff1f\uff5e",
+   "poster": "/api/anime/cover?key=ba0b881f26ac6ac3b9bcdc25f78f5287b9166eb4a852b57bedaab9f3db3d99e0",
+   "banner": "/api/anime/cover?key=ba0b881f26ac6ac3b9bcdc25f78f5287b9166eb4a852b57bedaab9f3db3d99e0",
+   "year": 2026,
+   "score": 7.39,
+   "rating": "N/A",
+   "duration": "24 min",
+   "status": "Currently Airing",
+   "type": "TV",
+   "genres": [
+    "Adventure",
+    "Comedy",
+    "Fantasy",
+    "Slice of Life"
+   ],
+   "studios": [
+    "P.A.WORKS"
+   ],
+   "episodeCount": 7,
+   "subCount": 7,
+   "dubCount": 7,
+   "synopsis": "Rain Garland, an enchantment mage belonging to the \u2018Fangs of the Royal Beast\u2019, one of the continent's five great guilds, was suddenly expelled from the guild one day. Filled with bitter disappointment at being betrayed by those he trusted, Rain retrieved all the Enhancement Points he had placed on the guild's armor. He then tried applying them to his own sword and clothes instead the cheap copper sword gained destructive power rivaling legendary blades, and the simple cloth garments gained defense comparable to orichalcum!? Moreover, Rain's enchantment magic held a cheat-level secret that allowed it to evolve even further!? After meeting new companions like the renowned beautiful knight Lily, who came upon hearing rumors of Rain, and the noble lady Martina, a candidate for the title of Hero, Rain begins to grow into a great adventurer...!?(Source: Kodansha, translated)",
+   "malId": 63431,
+   "anilistId": "207329",
+   "season": "FALL",
+   "tags": [
+    "Shounen",
+    "Male Protagonist",
+    "Magic"
+   ],
+   "providerTitles": [
+    "The Laid-Off Cheat-Granting Mage Enjoys a Second Lease on Life",
+    "Tsuihou Sareta Cheat Fuyo Majutsushi wa Kimama na Second Life wo Ouka Suru.: Ore wa Buki dake ja Naku, Arayuru Mono ni \"Kyouka Point\" wo Fuyo Dekiru shi, Ore no Ishi de Itsudemo Kouka wo Kaijo Dekiru kedo, Nokotta Hitotachi Daijoubu?",
+    "\u8ffd\u653e\u3055\u308c\u305f\u30c1\u30fc\u30c8\u4ed8\u4e0e\u9b54\u8853\u5e2b\u306f\u6c17\u307e\u307e\u306a\u30bb\u30ab\u30f3\u30c9\u30e9\u30a4\u30d5\u3092\u8b33\u6b4c\u3059\u308b\u3002 \uff5e\u4ffa\u306f\u6b66\u5668\u3060\u3051\u3058\u3083\u306a\u304f\u3001\u3042\u3089\u3086\u308b\u3082\u306e\u306b\u300e\u5f37\u5316\u30dd\u30a4\u30f3\u30c8\u300f\u3092\u4ed8\u4e0e\u3067\u304d\u308b\u3057\u3001\u4ffa\u306e\u610f\u601d\u3067\u3044\u3064\u3067\u3082\u52b9\u679c\u3092\u89e3\u9664\u3067\u304d\u308b\u3051\u3069\u3001\u6b8b\u3063\u305f\u4eba\u305f\u3061\u5927\u4e08\u592b\uff1f\uff5e",
+    "The Exiled Cheating Magician Enjoys an Unrestrained Second Life.: I Can Give \"Strengthening Points\" Not Only to Weapons, But Also to Everything, and I Can Unlock the Effect at Any Time of My Will, But are the Rest Okay?",
+    "Chii Fuyo",
+    "\u30c1\u30fc\u4ed8\u4e0e",
+    "The Laid-Off Cheat-Granting Mage Enjoys a New Life",
+    "Chii-Fuyo"
+   ],
+   "routeId": "the-laid-off-cheat-granting-mage-enjoys-a-second-lease-on-life-207329-ixwuwz"
+  }
+ ],
+ "studios": [],
+ "genres": [],
+ "tags": [],
+ "intent": null,
+ "didYouMean": null
+}

@@ -4,6 +4,27 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.9.3] - 2026-11-20
+
+### Diperbaiki
+
+- **ani.pm HTTP 404 untuk judul tertentu** (mis.
+  *The Laid-Off Cheat-Granting Mage Enjoys a Second Lease on Life*). ani.pm punya dua
+  provider: `settlar` (path `/anime/…`) dan `anilist` (path `/ani/…`). Kode lama
+  meng-hardcode `settlar` **dan** `/anime/`, sehingga judul ber-provider `anilist`
+  selalu 404 padahal ada.
+  Sekarang:
+  - `source` dari hasil pencarian menentukan prefix path (`/ani/` vs `/anime/`);
+  - bootstrap mencoba provider yang sesuai dulu lalu provider lain
+    (`anilist` → `settlar`, dan sebaliknya) dengan `ep=1` lalu `ep=0`;
+  - URL episode mengikuti prefix halaman asal (tidak lagi hardcode `/anime/`).
+- `route_id`/`episode_number` menerima `/anime/<id>` maupun `/ani/<id>`.
+
+### Ditambahkan
+
+- Fixture `anipm/search_anilist.json` + `bootstrap_anilist.json` dan test regresi
+  (prefix `/ani/`, 7 episode) agar bug dua-provider tidak kembali.
+
 ## [0.9.2] - 2026-11-20
 
 ### Diperbaiki

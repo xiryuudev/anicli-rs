@@ -50,24 +50,43 @@ impl AniPm {
         self.mirrors.resolve(&self.http, NAME).await
     }
 
-    async fn bootstrap(&self, base: &Url, route: &str, episode: u32) -> SourceResult<String> {
-        let path = format!("/api/anime/playback-bootstrap/settlar/{route}?ep={episode}&lang=sub");
+    async fn bootstrap(
+        &self,
+        base: &Url,
+        provider: &str,
+        route: &str,
+        episode: u32,
+    ) -> SourceResult<String> {
+        let path =
+            format!("/api/anime/playback-bootstrap/{provider}/{route}?ep={episode}&lang=sub");
         let url = base.join(&path).map_err(|err| {
             SourceError::parse(NAME, "detail", "url", format!("URL API tidak valid: {err}"))
         })?;
         self.http.get_text(NAME, &url, Some(base)).await
     }
 
-    /// Ambil metadata: coba `ep=1`, lalu `ep=0` (judul tanpa episode bernomor 1).
-    async fn bootstrap_detail(&self, base: &Url, route: &str) -> SourceResult<String> {
-        match self.bootstrap(base, route, 1).await {
-            Ok(body) if body.contains("\"core\"") => Ok(body),
-            other => match self.bootstrap(base, route, 0).await {
-                Ok(body) if body.contains("\"core\"") => Ok(body),
-                Ok(_) => other,
-                Err(_) => other,
-            },
+    /// Ambil metadata dengan fallback provider (`settlar`/`anilist`) dan nomor episode
+    /// (`ep=1` lalu `ep=0`). Provider asal judul tidak bisa ditebak dari HTML, jadi
+    /// dicoba berurutan; error terakhir dikembalikan bila semua gagal.
+    async fn bootstrap_detail(
+        &self,
+        base: &Url,
+        preferred: &str,
+        route: &str,
+    ) -> SourceResult<String> {
+        let mut last: Option<crate::error::SourceError> = None;
+        for provider in super::parse::provider_candidates(preferred) {
+            for episode in [1, 0] {
+                match self.bootstrap(base, provider, route, episode).await {
+                    Ok(body) if body.contains("\"core\"") => return Ok(body),
+                    Ok(_) => {}
+                    Err(err) => last = Some(err),
+                }
+            }
         }
+        Err(last.unwrap_or_else(|| {
+            SourceError::not_found(NAME, "judul ini tidak punya metadata di ani.pm".to_string())
+        }))
     }
 
     pub async fn search(&self, query: &str) -> SourceResult<Vec<AnimeSearchResult>> {
@@ -88,7 +107,8 @@ impl AniPm {
         let route = super::parse::route_id(&page_url).ok_or_else(|| {
             SourceError::parse(NAME, "detail", "routeId", "tidak ada routeId di URL")
         })?;
-        let body = self.bootstrap_detail(&base, &route).await?;
+        let preferred = super::parse::provider_from_path(&page_url);
+        let body = self.bootstrap_detail(&base, preferred, &route).await?;
         super::parse::parse_detail(&body, &page_url, &base, &self.source)
     }
 

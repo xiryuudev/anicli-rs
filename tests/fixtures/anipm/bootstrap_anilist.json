@@ -1,0 +1,223 @@
+{
+ "version": 1,
+ "source": "anilist",
+ "id": 207329,
+ "episode": 1,
+ "requestedLanguage": "sub",
+ "effectiveLanguage": "sub",
+ "availability": {
+  "sub": true,
+  "dub": true
+ },
+ "core": {
+  "id": 207329,
+  "source": "anilist",
+  "slug": null,
+  "title": "The Laid-Off Cheat-Granting Mage Enjoys a Second Lease on Life",
+  "native": "\u8ffd\u653e\u3055\u308c\u305f\u30c1\u30fc\u30c8\u4ed8\u4e0e\u9b54\u8853\u5e2b\u306f\u6c17\u307e\u307e\u306a\u30bb\u30ab\u30f3\u30c9\u30e9\u30a4\u30d5\u3092\u8b33\u6b4c\u3059\u308b\u3002 \uff5e\u4ffa\u306f\u6b66\u5668\u3060\u3051\u3058\u3083\u306a\u304f\u3001\u3042\u3089\u3086\u308b\u3082\u306e\u306b\u300e\u5f37\u5316\u30dd\u30a4\u30f3\u30c8\u300f\u3092\u4ed8\u4e0e\u3067\u304d\u308b\u3057\u3001\u4ffa\u306e\u610f\u601d\u3067\u3044\u3064\u3067\u3082\u52b9\u679c\u3092\u89e3\u9664\u3067\u304d\u308b\u3051\u3069\u3001\u6b8b\u3063\u305f\u4eba\u305f\u3061\u5927\u4e08\u592b\uff1f\uff5e",
+  "poster": "/api/anime/cover?anilistId=207329&malId=63431",
+  "banner": "/api/anime/cover?anilistId=207329&kind=banner",
+  "year": 2026,
+  "score": 7.39,
+  "rating": "N/A",
+  "duration": "24 min",
+  "status": "Currently Airing",
+  "type": "TV",
+  "genres": [
+   "Adventure",
+   "Comedy",
+   "Fantasy",
+   "Slice of Life"
+  ],
+  "studios": [
+   "P.A.WORKS"
+  ],
+  "episodeCount": 7,
+  "subCount": 7,
+  "dubCount": 7,
+  "synopsis": "Rain Garland, an enchantment mage belonging to the \u2018Fangs of the Royal Beast\u2019, one of the continent's five great guilds, was suddenly expelled from the guild one day. Filled with bitter disappointment at being betrayed by those he trusted, Rain retrieved all the Enhancement Points he had placed on the guild's armor. He then tried applying them to his own sword and clothes instead the cheap copper sword gained destructive power rivaling legendary blades, and the simple cloth garments gained defense comparable to orichalcum!? Moreover, Rain's enchantment magic held a cheat-level secret that allowed it to evolve even further!? After meeting new companions like the renowned beautiful knight Lily, who came upon hearing rumors of Rain, and the noble lady Martina, a candidate for the title of Hero, Rain begins to grow into a great adventurer...!?(Source: Kodansha, translated)",
+  "malId": 63431,
+  "anilistId": "207329",
+  "season": "FALL",
+  "hasDub": true,
+  "relations": [],
+  "tags": [
+   "Shounen",
+   "Male Protagonist",
+   "Magic"
+  ],
+  "recommendations": [],
+  "nextAiring": {
+   "episode": 8,
+   "airingAt": 1795532400,
+   "timeUntil": 397348
+  },
+  "settlarId": null,
+  "settlarCanonicalId": null,
+  "episodes": [
+   {
+    "number": 1,
+    "title": "Episode 1",
+    "thumbnail": null,
+    "description": null,
+    "runtimeSeconds": null,
+    "subExact": true,
+    "dubExact": true,
+    "embedId": "",
+    "sub": true,
+    "dub": true,
+    "routeId": "e2.DpQ0zLWZCNmsnyXAKsnuxbL_FEyoPEgSKwHVzlD6l2e13pxCCXMK3P3naPg"
+   },
+   {
+    "number": 2,
+    "title": "Episode 2",
+    "thumbnail": null,
+    "description": null,
+    "runtimeSeconds": null,
+    "subExact": true,
+    "dubExact": true,
+    "embedId": "",
+    "sub": true,
+    "dub": true,
+    "routeId": "e2.phlmKMkEoDflN8QiyZVPMFA42MyLLm9gZz_EBzE2LFwR33Tdu9vjUhwRXXc"
+   },
+   {
+    "number": 3,
+    "title": "Episode 3",
+    "thumbnail": null,
+    "description": null,
+    "runtimeSeconds": null,
+    "subExact": true,
+    "dubExact": true,
+    "embedId": "",
+    "sub": true,
+    "dub": true,
+    "routeId": "e2.iLoL3Ndm25HFwU0MAGlJ6FDtSm2iMmNq8g-gP3c58zyAsZA_1kVk7jJggG0"
+   },
+   {
+    "number": 4,
+    "title": "Episode 4",
+    "thumbnail": null,
+    "description": null,
+    "runtimeSeconds": null,
+    "subExact": true,
+    "dubExact": true,
+    "embedId": "",
+    "sub": true,
+    "dub": true,
+    "routeId": "e2.fXjlAbPeXIJ8zQwdFlPtbWo5suQaVfgbh2hCO9Wqe7590nG0uWkIBfg1eQY"
+   },
+   {
+    "number": 5,
+    "title": "Episode 5",
+    "thumbnail": null,
+    "description": null,
+    "runtimeSeconds": null,
+    "subExact": true,
+    "dubExact": true,
+    "embedId": "",
+    "sub": true,
+    "dub": true,
+    "routeId": "e2.CvG9_3EoRbfafo5I_JgRJKMJ_QxARJcIa0Jk6m6mTibTfVpjGuUtCIfepFg"
+   },
+   {
+    "number": 6,
+    "title": "Episode 6",
+    "thumbnail": null,
+    "description": null,
+    "runtimeSeconds": null,
+    "subExact": true,
+    "dubExact": true,
+    "embedId": "",
+    "sub": true,
+    "dub": true,
+    "routeId": "e2._pkvQCIgwVMoyBlH_9AtBVd8a-nMAXmTdedxo81au9CRrn3jHjp7_JmBt3A"
+   },
+   {
+    "number": 7,
+    "title": "Episode 7",
+    "thumbnail": null,
+    "description": null,
+    "runtimeSeconds": null,
+    "subExact": true,
+    "dubExact": true,
+    "embedId": "",
+    "sub": true,
+    "dub": true,
+    "routeId": "e2.jrYd00hy_wm1QXNsq9gwDwqpUav7naDym_c0jW6fg04b97IvimsdYmNRnNc"
+   }
+  ],
+  "routeId": "the-laid-off-cheat-granting-mage-enjoys-a-second-lease-on-life-207329-ixwuwz"
+ },
+ "skip": null,
+ "settlarSelection": "2.gVA2E8bhSEq-4KNH2QNLbaVMCp6n4WQKZrzzJx5quIcgQXUiyOUoA0V6XyNd930KoB-q9j34CHIM56pxbMgvGbYYgtljgDF9ZJGyjWhKjGjfVJ36qzsyCUfqPapNufdhWjn-xneOnM4PBTmhcjsQgw6NT2ixXZ-0Ny8bYvV9C5HrXMaf8fMkMVOwjRD9T0-GGKL8txo6hkymkzTHdZq7dNde45zXfVHFFiwqe82OSRJDoze1vakH4c6iMMyrWLQhX2b6B2X_uiIkXEXMcsl1gFhgbvgzYVwtHshopvsygcyoLw7BhnAKODAE9l7O6x5uEKvuTEnoRGuIPNaSnpZbJJ5oYw",
+ "anipmPackages": {
+  "anilistId": 207329,
+  "generatedAt": "2026-11-20T00:33:11.305Z",
+  "configured": true,
+  "episodes": {
+   "1": {
+    "key": "a207329e1",
+    "sub": true,
+    "dub": true,
+    "subhard": true,
+    "dubhard": true,
+    "subcr": true,
+    "dubcr": true
+   },
+   "2": {
+    "key": "a207329e2",
+    "sub": true,
+    "dub": true,
+    "subhard": true,
+    "dubhard": true,
+    "subcr": true,
+    "dubcr": true
+   },
+   "3": {
+    "key": "a207329e3",
+    "sub": true,
+    "dub": true,
+    "subhard": true,
+    "dubhard": true,
+    "subcr": true,
+    "dubcr": true
+   },
+   "4": {
+    "key": "a207329e4",
+    "sub": true,
+    "dub": true,
+    "subhard": true,
+    "dubhard": true,
+    "subcr": true,
+    "dubcr": true
+   },
+   "5": {
+    "key": "a207329e5",
+    "sub": true,
+    "dub": true,
+    "subhard": true,
+    "dubhard": true
+   },
+   "6": {
+    "key": "a207329e6",
+    "sub": true,
+    "dub": true,
+    "subhard": true,
+    "dubhard": true,
+    "subcr": true,
+    "dubcr": true
+   },
+   "7": {
+    "key": "a207329e7",
+    "sub": true,
+    "dub": true,
+    "subhard": true,
+    "dubhard": true,
+    "subcr": true,
+    "dubcr": true
+   }
+  }
+ },
+ "episodeRouteId": "e2.DpQ0zLWZCNmsnyXAKsnuxbL_FEyoPEgSKwHVzlD6l2e13pxCCXMK3P3naPg"
+}
