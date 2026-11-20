@@ -4,6 +4,16 @@ Semua perubahan penting pada proyek ini didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 [Semantic Versioning](https://semver.org/lang/id/).
 
+## [0.10.1] - 2026-11-20
+
+### Diperbaiki
+
+- **Config lama yang masih menunjuk domain Anichin palsu** (`z1.anichin.blog` /
+  `anichin.blog`) sekarang otomatis diperbaiki saat start: `base_url` diganti ke
+  `https://anichin.moe` beserta mirror resmi, sementara `enabled` dan mirror pilihan
+  user tidak diubah. Sebelumnya migrasi hanya menambah source baru, sehingga pengguna
+  lama tetap terhubung ke situs palsu itu.
+
 ## [0.10.0] - 2026-11-20
 
 ### Diperbaiki

@@ -48,6 +48,10 @@ pub struct Config {
 /// Tambahkan source baru dari default bila belum ada di config user.
 ///
 /// Mengembalikan nama source yang ditambahkan (untuk warning + disimpan).
+/// Host yang sudah tidak dipakai (palsu/pindah) → diganti base_url default.
+const RETIRED_HOSTS: &[(&str, &str)] =
+    &[("anichin", "anichin.blog"), ("anichin", "z1.anichin.blog")];
+
 fn merge_new_sources(config: &mut Config) -> Vec<String> {
     // Kalau user sengaja menonaktifkan semuanya, jangan tambah source baru:
     // biarkan validasi yang memberi tahu (menghindari perilaku mengejutkan).
@@ -57,9 +61,30 @@ fn merge_new_sources(config: &mut Config) -> Vec<String> {
     let defaults = Config::default();
     let mut added = Vec::new();
     for (name, default_source) in &defaults.sources {
-        if !config.sources.contains_key(name) {
-            config.sources.insert(name.clone(), default_source.clone());
-            added.push(name.clone());
+        match config.sources.get(name) {
+            None => {
+                config.sources.insert(name.clone(), default_source.clone());
+                added.push(name.clone());
+            }
+            Some(current) => {
+                // Domain resmi bisa berubah (mis. `z1.anichin.blog` ternyata situs
+                // palsu). Ganti hanya bila host lama masuk daftar usang; mirror dan
+                // enabled milik user dibiarkan.
+                if RETIRED_HOSTS
+                    .iter()
+                    .any(|(source, host)| source == name && current.base_url.contains(host))
+                {
+                    config.sources.insert(
+                        name.clone(),
+                        SourceConfig {
+                            enabled: current.enabled,
+                            base_url: default_source.base_url.clone(),
+                            mirrors: default_source.mirrors.clone(),
+                        },
+                    );
+                    added.push(name.clone());
+                }
+            }
         }
     }
     if added.is_empty() {
@@ -1143,6 +1168,29 @@ mod tests {
         let err = load(&paths).unwrap_err().to_string();
         assert!(err.contains("general.default_source"), "{err}");
         assert!(err.contains("nope"), "{err}");
+    }
+
+    #[test]
+    fn retired_anichin_host_is_replaced_on_load() {
+        let (_tmp, paths) = temp_paths();
+        write_config(
+            &paths,
+            "config_version = 1\n\
+             [general]\ndefault_source = \"anichin\"\n\n\
+             [sources.anichin]\nenabled = true\nbase_url = \"https://z1.anichin.blog\"\n\
+             [sources.samehadaku]\nenabled = true\nbase_url = \"https://v2.samehadaku.how\"\n",
+        );
+        let loaded = load(&paths).unwrap();
+        assert_eq!(
+            loaded.config.sources["anichin"].base_url, "https://anichin.moe",
+            "domain palsu harus diganti: {}",
+            loaded.config.sources["anichin"].base_url
+        );
+        // Source lain tidak tersentuh.
+        assert_eq!(
+            loaded.config.sources["samehadaku"].base_url,
+            "https://v2.samehadaku.how"
+        );
     }
 
     #[test]
