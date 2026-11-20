@@ -29,6 +29,9 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan
 
 ### Catatan
 
+- Hasil pencarian bisa memuat spin-off/movie tanpa episode (mis. animotvslash
+  "Chainsaw Man: Assassins Arc" = 0 episode, versi serialnya 12 episode). Pilih kartu
+  yang benar di layar Cari — judul yang punya episode menampilkan jumlahnya.
 - Kuramanime tidak mempublikasikan jumlah episode untuk serial **ongoing** panjang
   (mis. One Piece menampilkan `?`); untuk judul seperti itu daftar episode kosong dan
   pemutaran harus lewat situs. Judul dengan jumlah episode diketahui (mis. Boruto 293,
